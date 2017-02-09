@@ -168,7 +168,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <TypeScriptCompile Include="ATFWChart.ts" />
     <TypeScriptCompile Include="config.ts" />
     <TypeScriptCompile Include="lib\PubSub.ts" />
     <TypeScriptCompile Include="script\FChartX.ts" />
