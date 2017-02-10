@@ -57,6 +57,11 @@
         InnerBottom
     }
 
+    export enum LegendContentLayout {
+        Horizontal,
+        Vertical
+    }
+
     export enum ChartZoomMode {
         MousePosition,
         Center
@@ -201,6 +206,11 @@
         Right
     }
 
+    export enum LengthType {
+        Percentage,
+        Value
+    }
+
     export enum XAxisType {
         Date,
         Number,
@@ -253,7 +263,7 @@
 
     export class FChartTick extends ChartGraphObject {
         IsXAxisTick: boolean = false;
-        MinIntervalSpace: number = 30;
+        MinIntervalSpace: number = 10;
         LabelLayout: TickLabelLayout = TickLabelLayout.CenterOfTick;
         LabelFormat: string = "";
         Rotation: number = 0;
@@ -283,7 +293,6 @@
     }
 
     export class FChartXAxis extends FChartAxis {
-        public UseDefaultHeight: boolean = true;
         public Height: number = 0;
         public Type: XAxisType = XAxisType.Date;
         public TickSelection: XAxisDateTickSelection = XAxisDateTickSelection.Day;
@@ -381,7 +390,6 @@
     }
 
     export class FChartYAxis extends FChartAxis {
-        public UseDefaultWidth: boolean = true;
         public Width: number = 0;
         public Title: FChartYAxisTitle = new FChartYAxisTitle();
         public Layout: YAxisLayout = YAxisLayout.Left;
@@ -540,10 +548,15 @@
         }
     }
 
-    //class Point {
-    //    public X: number = 0;
-    //    public Y: number = 0;
-    //}
+    class Size {
+        public Width: number = 0;
+        public Height: number = 0;
+
+        constructor(w: number, h: number) {
+            this.Width = w;
+            this.Height = h;
+        }
+    }
 
     export class FChartDataSerie extends ChartGraphObject {
         public Data: DataPoint[] = new Array<DataPoint>();
@@ -832,12 +845,154 @@
     export class FChartLegend extends ChartGraphObject {
         public LabelFormat: string;
         public Layout: LegendLayout = LegendLayout.Right;
+        public ContentLayout: LegendContentLayout = LegendContentLayout.Vertical;
         public Width: number = 0;
         public Height: number = 0;
         private MinWidth: number = 20;
         private MinHeight: number = 10;
-        private MaxShapeWidth: number = 20;
-        private ShapeWidth: number = 0;
+        public ShapeWidth: number = 0;
+        public LabelWidth: number = 0;
+        public LabelHeight: number = 0;
+
+        private FontSizeW: number = 0;
+        private FontSizeH: number = 0;
+        private LargeTextW: string = "";
+        private LargeTextH: string = "";
+        private readonly LEGEND_ITEM_MAX_WIDTH: number = 200;
+        private readonly LEGEND_ITEM_MAX_HEIGHT: number = 50;
+        public MAX_SHAPE_WIDTH: number = 20;
+        private HorizontalMeasured: boolean = false;
+        private VerticalMeasured: boolean = false;
+
+        public PredictWidth(chart: FChart, w: number) {
+            let dLegendItemWidth: number = Math.min(w, this.LEGEND_ITEM_MAX_WIDTH);
+            if (this.ContentLayout == LegendContentLayout.Horizontal) {
+                for (let i = 0; i < chart.DataSeries.length; i++) {
+                    if (chart.DataSeries[i].Show) {
+                        this.Width += dLegendItemWidth;
+                    }
+                }
+            }
+            else if (this.ContentLayout == LegendContentLayout.Vertical) {
+                this.Width = dLegendItemWidth;
+            }
+
+            // Measure.
+            this.ShapeWidth = Math.min(this.Width * 0.3, this.MAX_SHAPE_WIDTH);
+            let maxTextWidth: number = this.Width - this.MAX_SHAPE_WIDTH;
+            let biggestTextWidth: number = 0;
+            this.FontSizeW = this.FontSize;
+
+            for (let i = 0; i < chart.DataSeries.length; i++) {
+                let serie: FChartDataSerie = chart.DataSeries[i];
+                if (!serie.Show) {
+                    continue;
+                }
+
+                let lbl: string = serie.Label;
+                let text: SVGTextElement = chart.CreateSVGTextElement();
+                let lx: number = 0;
+                let ly: number = 0;
+                let textID: string = "Legend-item-" + i.toString() + "-" + lbl;
+                FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), lbl, "start", this.FontFamily, this.FontStyle, this.FontSizeW.toString(), this.FontWeight);
+                let textInfo: KeyValuePair<number, number> = chart.GetAppropriateFontSizeForText(text, this.FontSizeW, maxTextWidth);
+                if (textInfo.Value > biggestTextWidth) {
+                    biggestTextWidth = textInfo.Value;
+                    this.LargeTextW = lbl;
+                }
+                this.FontSizeW = this.FontSizeW > textInfo.Key ? textInfo.Key : this.FontSizeW;
+            }
+
+            this.LabelWidth = biggestTextWidth;
+            this.Width = this.ShapeWidth + this.LabelWidth;
+            this.HorizontalMeasured = true;
+        }
+
+        public PredictHeight(chart: FChart, h: number) {
+            let dLegendItemHeight: number = Math.min(h, this.LEGEND_ITEM_MAX_HEIGHT);
+            if (this.ContentLayout == LegendContentLayout.Horizontal) {
+
+                this.Height = dLegendItemHeight;
+            }
+            else if (this.ContentLayout == LegendContentLayout.Vertical) {
+                for (let i = 0; i < chart.DataSeries.length; i++) {
+                    if (chart.DataSeries[i].Show) {
+                        this.Height += dLegendItemHeight;
+                    }
+                }
+            }
+
+            // Measure.
+            let maxTextHeight: number = dLegendItemHeight;
+            let biggestTextHeight: number = 0;
+            this.FontSizeH = this.FontSize;
+
+            for (let i = 0; i < chart.DataSeries.length; i++) {
+                let serie: FChartDataSerie = chart.DataSeries[i];
+                if (!serie.Show) {
+                    continue;
+                }
+
+                let lbl: string = serie.Label;
+                let text: SVGTextElement = chart.CreateSVGTextElement();
+                let lx: number = 0;
+                let ly: number = 0;
+                let textID: string = "Legend-item-" + i.toString() + "-" + lbl;
+                FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), lbl, "start", this.FontFamily, this.FontStyle, this.FontSizeH.toString(), this.FontWeight);
+                let textInfo: KeyValuePair<number, number> = chart.GetAppropriateFontSizeForText(text, this.FontSizeW, maxTextHeight, false);
+                if (textInfo.Value > biggestTextHeight) {
+                    biggestTextHeight = textInfo.Value;
+                    this.LargeTextH = lbl;
+                }
+                this.FontSizeH = this.FontSizeH > textInfo.Key ? textInfo.Key : this.FontSizeH;
+            }
+
+            this.LabelHeight = biggestTextHeight;
+            this.Height = this.LabelHeight;
+            this.VerticalMeasured = true;
+        }
+
+        public CalculateSize(chart: FChart) {
+            let sz: Size = new Size(0, 0);
+
+            if (!this.HorizontalMeasured || !this.VerticalMeasured) {
+                return;
+            }
+
+            this.FontSize = this.FontSizeW > this.FontSizeH ? this.FontSizeH : this.FontSizeW;
+            let textSize1: Size = chart.GetTextSize(this.LargeTextW, this.FontSize.toString(), this.FontFamily, this.FontStyle, this.FontWeight);
+            let textSize2: Size = chart.GetTextSize(this.LargeTextH, this.FontSize.toString(), this.FontFamily, this.FontStyle, this.FontWeight);
+            this.LabelWidth = textSize1.Width;
+            this.LabelHeight = textSize2.Height;
+
+            this.Width = 0;
+            let dLegendItemWidth: number = this.ShapeWidth + this.LabelWidth;
+            if (this.ContentLayout == LegendContentLayout.Horizontal) {
+                for (let i = 0; i < chart.DataSeries.length; i++) {
+                    if (chart.DataSeries[i].Show) {
+                        this.Width += dLegendItemWidth;
+                    }
+                }
+            }
+            else if (this.ContentLayout == LegendContentLayout.Vertical) {
+                this.Width = dLegendItemWidth;
+            }
+
+            this.Height = 0;
+            let dLegendItemHeight: number = this.LabelHeight;
+            if (this.ContentLayout == LegendContentLayout.Horizontal) {
+                this.Height = dLegendItemHeight;
+            }
+            else if (this.ContentLayout == LegendContentLayout.Vertical) {
+                for (let i = 0; i < chart.DataSeries.length; i++) {
+                    if (chart.DataSeries[i].Show) {
+                        this.Height += dLegendItemHeight;
+                    }
+                }
+            }
+
+            this.FontSize /= 1.5;                       // Leave some margin for box.
+        }
 
         Draw(chart: FChart): void {
             if (!this.Show) {
@@ -863,32 +1018,10 @@
             let nSeriesCount = chart.GetVisibleDataSeriesCount();
             let itemWidth = this.Width;
             let itemHeight = this.Height / nSeriesCount;
-            this.ShapeWidth = Math.min(this.Width * 0.3, this.MaxShapeWidth);
+            this.ShapeWidth = Math.min(this.Width * 0.3, this.MAX_SHAPE_WIDTH);
             let maxTextWidth: number = this.Width - this.ShapeWidth;
 
-            // Measure.
-            let biggestTextWidth: number = 0;
-            for (let i = 0; i < chart.DataSeries.length; i++) {
-                let serie: FChartDataSerie = chart.DataSeries[i];
-                if (!serie.Show) {
-                    continue;
-                }
-
-                let lbl: string = serie.Label;
-                let text: SVGTextElement = chart.CreateSVGTextElement();
-                let lx: number = 0;
-                let ly: number = 0;
-                let textID: string = "Legend-item-" + i.toString() + "-" + lbl;
-                FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), lbl, "start", this.FontFamily, this.FontStyle, this.FontSize.toString(), this.FontWeight);
-                let textInfo: KeyValuePair<number, number> = chart.GetAppropriateFontSizeForText(text, this.FontSize, maxTextWidth);
-                if (textInfo.Value > biggestTextWidth) {
-                    biggestTextWidth = textInfo.Value;
-                }
-                this.FontSize = textInfo.Key;
-            }
-
             // Draw.
-            this.Width = this.ShapeWidth + biggestTextWidth;
             let rectOutline: SVGRectElement = chart.CreateSVGRectElement();
             FChartHelper.SetSVGRectAttributes(rectOutline, "legend-outline", "0", "0", this.Width.toString(), this.Height.toString(), "1", "blue");
             svgLegend.appendChild(rectOutline);
@@ -1291,10 +1424,7 @@
         public Legend: FChartLegend = new FChartLegend();
         public Zoom: number = 1.0;
         public ZoomMode: ChartZoomMode = ChartZoomMode.Center;
-        private DefaultXAxisMargin: number = 10;
-        private MaxXAxisMargin: number = 50;
-        private MinChartWidth: number = 50;
-        private MinChartHeight: number = 50;
+
         public XAxisLeftMargin: number = 10;
         public XAxisRightMargin: number = 50;
         public XAxes: FChartXAxis[] = new Array<FChartXAxis>();
@@ -1306,11 +1436,22 @@
         public SVGMeasure: SVGSVGElement = null;
         private m_arrSVG: SVGSVGElement[] = new Array<SVGSVGElement>();
 
-        private ONE_DAY: number = 86400000;
-        private ONE_HOUR: number = 3600000;
-        private ONE_MINUTE: number = 60000;
-        private ONE_SECOND: number = 1000;
-        private ONE_MILLISECOND: number = 1;
+        public UseFixedYAxesWidth: boolean = false;
+        public FixedYAxesWidth: number = 0;
+        public FixedYAxesLengthType: LengthType = LengthType.Value;
+
+        public UseFixedXAxesHeight: boolean = false;
+        public FixedXAxesHeight: number = 0;
+        public FixedXAxesLengthType: LengthType = LengthType.Percentage;
+
+        private readonly ONE_DAY: number = 86400000;
+        private readonly ONE_HOUR: number = 3600000;
+        private readonly ONE_MINUTE: number = 60000;
+        private readonly ONE_SECOND: number = 1000;
+        private readonly ONE_MILLISECOND: number = 1;
+
+        private readonly MIN_CHART_WIDTH: number = 50;
+        private readonly MIN_CHART_HEIGHT: number = 50;
 
         private ChartWidth: number = 0;
         private ChartHeight: number = 0;
@@ -1318,6 +1459,9 @@
         private PlotHeight: number = 0;
         public MaxYAxisWidth: number = 100;
         public MaxXAxisHeight: number = 100;
+
+        private YAxisDefaultWidth: number = 80;
+        private XAxisDefaultHeight: number = 80;
 
         private SortedDataSeries: boolean = false;
 
@@ -1539,14 +1683,14 @@
                 return false;
             }
 
-            if (w < this.MinChartWidth || h < this.MinChartHeight) {
+            if (w < this.MIN_CHART_WIDTH || h < this.MIN_CHART_HEIGHT) {
                 bValid = false;
             }
 
             return bValid;
         }
 
-        private GetContainerSize(): KeyValuePair<number, number> {
+        private GetContainerSize(): Size {
             let divBindTo: HTMLDivElement = document.getElementById(this.BindTo) as HTMLDivElement;
             if (FChartHelper.ObjectIsNullOrEmpty(divBindTo)) {
                 return null;
@@ -1554,7 +1698,7 @@
             let w: number = divBindTo.clientWidth;
             let h: number = divBindTo.clientHeight;
 
-            return (new KeyValuePair<number, number>(w, h));
+            return (new Size(w, h));
         }
 
         private IsWindowZooming: boolean = false;
@@ -1969,6 +2113,7 @@
         }
 
         private GetTickCount(averageDiff: number, max: number, min: number): KeyValuePair<number, number> {
+            averageDiff = Math.abs(averageDiff);
             let obj: KeyValuePair<number, number> = null;
             let t1 = 0;
             let t2 = 0;
@@ -2077,8 +2222,8 @@
 
             let obj: NumberTicksInfo = new NumberTicksInfo(tickInfo.Key, tickInfo.Value, averageDiff, 0);
 
-            let serie = null;
-            let xaxis = null;
+            let serie: FChartDataSerie = null;
+            let xaxis: FChartXAxis = null;
             for (let i = 0; i < this.DataSeries.length; i++) {
                 if (this.DataSeries[i].XAxisID == XAxisID) {
                     serie = this.DataSeries[i];
@@ -2205,6 +2350,83 @@
             return obj;
         }
 
+        private CalculateXAxesHeight(h: number): number {
+            let xAxesHeight: number = 0;
+
+            if (this.UseFixedXAxesHeight) {
+                this.FixedXAxesHeight = Math.abs(this.FixedXAxesHeight);
+                if (this.FixedXAxesLengthType == LengthType.Percentage) {
+                    if (isNaN(this.FixedXAxesHeight) || this.FixedXAxesHeight <= 0 || this.FixedXAxesHeight > 1) {
+                        this.FixedXAxesHeight = 0.5;
+                    }
+                    xAxesHeight = this.ChartWidth * this.FixedXAxesHeight;
+                }
+                else if (this.FixedXAxesLengthType == LengthType.Value) {
+                    if (this.FixedXAxesHeight > this.ChartHeight) {
+                        this.FixedXAxesHeight = this.ChartHeight;
+                    }
+                    xAxesHeight = this.FixedXAxesHeight;
+                }
+            }
+            else {
+                let nCount: number = this.GetDisplayXAxesCount();
+                let predictHeight: number = this.XAxisDefaultHeight * nCount;
+                let maxHeight: number = 0;
+                if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
+                    maxHeight = h * 0.3;
+                }
+                else {
+                    maxHeight = h * 0.5;
+                }
+
+                if (predictHeight > maxHeight) {
+                    predictHeight = maxHeight;
+                }
+                xAxesHeight = predictHeight;
+            }
+
+            return xAxesHeight;
+        }
+
+        private CalculateYAxesWidth(w: number): number {
+            let yAxesWidth: number = 0;
+
+            if (this.UseFixedYAxesWidth) {
+                let wYAxes: number = 0;
+                this.FixedYAxesWidth = Math.abs(this.FixedYAxesWidth);
+                if (this.FixedYAxesLengthType == LengthType.Percentage) {
+                    if (isNaN(this.FixedYAxesWidth) || this.FixedYAxesWidth <= 0 || this.FixedYAxesWidth > 1) {
+                        this.FixedYAxesWidth = 0.5;
+                    }
+                    yAxesWidth = this.ChartWidth * this.FixedYAxesWidth;
+                }
+                else if (this.FixedYAxesLengthType == LengthType.Value) {
+                    if (this.FixedYAxesWidth > this.ChartWidth) {
+                        this.FixedYAxesWidth = this.ChartWidth;
+                    }
+                    yAxesWidth = this.FixedYAxesWidth;
+                }
+            }
+            else {
+                let nCount: number = this.GetDisplayYAxesCount();
+                let predictWidth: number = this.YAxisDefaultWidth * nCount;
+                let maxWidth: number = 0;
+                if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
+                    maxWidth = w * 0.3;
+                }
+                else {
+                    maxWidth = w * 0.5;
+                }
+
+                if (predictWidth > maxWidth) {
+                    predictWidth = maxWidth;
+                }
+                yAxesWidth = predictWidth;
+            }
+
+            return yAxesWidth;
+        }
+
         private CalculateChartSize(): boolean {
             let bRet: boolean = false;
 
@@ -2231,59 +2453,61 @@
         }
 
         private CalculatePartsSize(): void {
-            let nMaxYAxisWidth = 100;
-            for (let i = 0; i < this.YAxes.length; i++) {
-                let yaxis: FChartYAxis = this.YAxes[i];
-                if (!yaxis.Show) {
-                    continue;
-                }
-                if (yaxis.UseDefaultWidth) {
-                    yaxis.Width = Math.min(this.ChartWidth * 0.1, this.MaxYAxisWidth);
-                    yaxis.Tick.Width = yaxis.Width * 0.2;
-                }
-            }
+            let dYAxesWidth: number = 0;
+            let dPlotWidth: number = 0;
 
-            let nMaxXAxisHeight = 100;
-            for (let i = 0; i < this.XAxes.length; i++) {
-                let xaxis: FChartXAxis = this.XAxes[i];
-                if (!xaxis.Show) {
-                    continue;
-                }
-                if (xaxis.UseDefaultHeight) {
-                    xaxis.Height = Math.min(this.ChartHeight * 0.125, this.MaxXAxisHeight);
-                    xaxis.Tick.Height = xaxis.Height * 0.2;
-                }
-            }
-
-            let nLegendItemWidth = Math.min(this.ChartWidth * 0.3, 150);
-            let nLegendItemHeight = Math.min(this.ChartHeight * 0.2, 18);
-            this.Legend.Width = this.DataSeries.length * nLegendItemWidth;
-            this.Legend.Height = this.DataSeries.length * nLegendItemHeight;
-
-            let nSubtractWidth = 0;
-            let nSubtractHeight = 0;
+            let yAxesWidth: number = this.CalculateYAxesWidth(this.ChartWidth);
+            let nCountY: number = this.GetDisplayYAxesCount();
+            let yw: number = yAxesWidth / nCountY;
             for (let i = 0; i < this.YAxes.length; i++) {
                 if (this.YAxes[i].Show) {
-                    nSubtractWidth += this.YAxes[i].Width;
+                    this.YAxes[i].Width = yw;
+                    this.YAxes[i].Tick.Width = yw * 0.2;
                 }
             }
+
+            let xAxesHeight: number = this.CalculateXAxesHeight(this.ChartHeight);
+            let nCountX: number = this.GetDisplayXAxesCount();
+            let xh: number = xAxesHeight / nCountX;
             for (let i = 0; i < this.XAxes.length; i++) {
                 if (this.XAxes[i].Show) {
-                    nSubtractHeight += this.XAxes[i].Height;
+                    this.XAxes[i].Height = xh;
+                    this.XAxes[i].Tick.Height = xh * 0.2;
                 }
             }
 
-            if (this.Legend.Show) {
-                if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
-                    nSubtractWidth += this.Legend.Width;
-                }
-                if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
-                    nSubtractHeight += this.Legend.Height;
-                }
+            if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
+                let w: number = this.ChartWidth - yAxesWidth;
+                let h: number = this.ChartHeight - xAxesHeight;
+                this.Legend.PredictWidth(this, w * 0.3);
+                this.Legend.PredictHeight(this, h);
+                this.Legend.CalculateSize(this);
+
+                this.PlotWidth = this.ChartWidth - yAxesWidth - this.Legend.Width;
+                this.PlotHeight = this.ChartHeight - xAxesHeight;
+            }
+            else if (this.Legend.Layout == LegendLayout.InnerLeft || this.Legend.Layout == LegendLayout.InnerRight) {
+                this.PlotWidth = this.ChartWidth - yAxesWidth;
+                this.PlotHeight = this.ChartHeight - xAxesHeight;
+                this.Legend.PredictWidth(this, this.PlotWidth * 0.3);
+                this.Legend.PredictHeight(this, this.PlotHeight);
+            }
+            else if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
+                let w: number = this.ChartWidth - yAxesWidth;
+                let h: number = this.ChartHeight - xAxesHeight;
+                this.Legend.PredictWidth(this, w);
+                this.Legend.PredictHeight(this, h * 0.3);
+
+                this.PlotWidth = this.ChartWidth - yAxesWidth;
+                this.PlotHeight = this.ChartHeight - xAxesHeight - this.Legend.Height;
+            }
+            else if (this.Legend.Layout == LegendLayout.InnerTop || this.Legend.Layout == LegendLayout.InnerBottom) {
+                this.PlotWidth = this.ChartWidth - yAxesWidth;
+                this.PlotHeight = this.ChartHeight - xAxesHeight;
+                this.Legend.PredictWidth(this, this.PlotWidth);
+                this.Legend.PredictHeight(this, this.PlotHeight * 0.3);
             }
 
-            this.PlotWidth = this.ChartWidth - nSubtractWidth;
-            this.PlotHeight = this.ChartHeight - nSubtractHeight;
             this.m_width = this.PlotWidth;
             this.m_height = this.PlotHeight;
             if (this.XAxisMargin > 0) {
@@ -2294,14 +2518,8 @@
         }
 
         private CalculatePartsPosition() {
-            let nDisplayXAxesCount = 0;
-            let xaxis: FChartXAxis = null;
-            for (let i = 0; i < this.XAxes.length; i++) {
-                if (this.XAxes[i].Show) {
-                    nDisplayXAxesCount++;
-                    xaxis = this.XAxes[i];
-                }
-            }
+            let nDisplayXAxesCount: number = this.GetDisplayXAxesCount();
+            let xaxis: FChartXAxis = this.GetXAxis();
 
             let lyaxes: FChartYAxis[] = new Array<FChartYAxis>();
             let ryaxes: FChartYAxis[] = new Array<FChartYAxis>();
@@ -2328,7 +2546,6 @@
 
             let xStart = 0;
             let yStart = 0;
-
             if (nDisplayXAxesCount == 1) {
                 yStart += xaxis.Height / 2;
             }
@@ -2816,16 +3033,13 @@
                 return;
             }
 
-            let size: KeyValuePair<number, number> = this.GetContainerSize();
-            if (FChartHelper.ObjectIsNullOrEmpty(size)) {
-                return;
-            }
-            if (this.ContainerWidth == size.Key && this.ContainerHeight == size.Value) {
+            let sz: Size = this.GetContainerSize();
+            if (this.ContainerWidth == sz.Width && this.ContainerHeight == sz.Height) {
                 return;
             }
 
-            this.ContainerWidth = size.Key;
-            this.ContainerHeight = size.Value;
+            this.ContainerWidth = sz.Width;
+            this.ContainerHeight = sz.Height;
 
             this.SetCoordinate();
             this.Draw();
@@ -2844,23 +3058,49 @@
         private OnClick(e): void {
         }
 
-        public GetAppropriateFontSizeForText(text: SVGTextElement, fontSize: number, maxTextWidth: number): KeyValuePair<number, number> {
+        public GetAppropriateFontSizeForText(text: SVGTextElement, fontSize: number, space: number, bHorizontal: boolean = true): KeyValuePair<number, number> {
             let textInfo: KeyValuePair<number, number> = null;
             this.SVGMeasure.appendChild(text);
             let rightfontSize: number = fontSize;
             let labelBox = text.getBBox();
-            if (labelBox.width > maxTextWidth) {
-                while (labelBox.width > maxTextWidth && rightfontSize > 0) {
-                    rightfontSize--;
-                    text.setAttribute("font-size", rightfontSize.toString());
-                    labelBox = text.getBBox();
+
+            if (bHorizontal) {
+                if (labelBox.width > space) {
+                    while (labelBox.width > space && rightfontSize > 0) {
+                        rightfontSize--;
+                        text.setAttribute("font-size", rightfontSize.toString());
+                        labelBox = text.getBBox();
+                    }
                 }
+                textInfo = new KeyValuePair<number, number>(rightfontSize, labelBox.width);
             }
-            textInfo = new KeyValuePair<number, number>(rightfontSize, labelBox.width);
+            else {
+                if (labelBox.height > space) {
+                    while (labelBox.height > space && rightfontSize > 0) {
+                        rightfontSize--;
+                        text.setAttribute("font-size", rightfontSize.toString());
+                        labelBox = text.getBBox();
+                    }
+                }
+                textInfo = new KeyValuePair<number, number>(rightfontSize, labelBox.height);
+            }
 
             this.SVGMeasure.removeChild(text);
 
             return textInfo;
+        }
+
+        public GetTextSize(lbl: string, fontSize: string, fontFamily: string, fontStyle: string, fontWeight: string): Size {
+            let sz: Size = new Size(0, 0);
+            let text: SVGTextElement = this.CreateSVGTextElement();
+            FChartHelper.SetSVGTextAttributes(text, "text-1", "0", "0", lbl, "start", fontFamily, fontStyle, fontSize, fontWeight);
+            this.SVGMeasure.appendChild(text);
+            let labelBox = text.getBBox();
+            sz.Width = labelBox.width;
+            sz.Height = labelBox.height;
+            this.SVGMeasure.removeChild(text);
+
+            return sz;
         }
 
         public CreateSVGLineElement(): SVGLineElement {

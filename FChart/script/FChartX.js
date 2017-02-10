@@ -61,6 +61,11 @@ define(["require", "exports"], function (require, exports) {
         LegendLayout[LegendLayout["InnerBottom"] = 7] = "InnerBottom";
     })(exports.LegendLayout || (exports.LegendLayout = {}));
     var LegendLayout = exports.LegendLayout;
+    (function (LegendContentLayout) {
+        LegendContentLayout[LegendContentLayout["Horizontal"] = 0] = "Horizontal";
+        LegendContentLayout[LegendContentLayout["Vertical"] = 1] = "Vertical";
+    })(exports.LegendContentLayout || (exports.LegendContentLayout = {}));
+    var LegendContentLayout = exports.LegendContentLayout;
     (function (ChartZoomMode) {
         ChartZoomMode[ChartZoomMode["MousePosition"] = 0] = "MousePosition";
         ChartZoomMode[ChartZoomMode["Center"] = 1] = "Center";
@@ -175,6 +180,11 @@ define(["require", "exports"], function (require, exports) {
         YAxisLayout[YAxisLayout["Right"] = 1] = "Right";
     })(exports.YAxisLayout || (exports.YAxisLayout = {}));
     var YAxisLayout = exports.YAxisLayout;
+    (function (LengthType) {
+        LengthType[LengthType["Percentage"] = 0] = "Percentage";
+        LengthType[LengthType["Value"] = 1] = "Value";
+    })(exports.LengthType || (exports.LengthType = {}));
+    var LengthType = exports.LengthType;
     (function (XAxisType) {
         XAxisType[XAxisType["Date"] = 0] = "Date";
         XAxisType[XAxisType["Number"] = 1] = "Number";
@@ -245,7 +255,7 @@ define(["require", "exports"], function (require, exports) {
         function FChartTick() {
             _super.apply(this, arguments);
             this.IsXAxisTick = false;
-            this.MinIntervalSpace = 30;
+            this.MinIntervalSpace = 10;
             this.LabelLayout = TickLabelLayout.CenterOfTick;
             this.LabelFormat = "";
             this.Rotation = 0;
@@ -279,7 +289,6 @@ define(["require", "exports"], function (require, exports) {
         __extends(FChartXAxis, _super);
         function FChartXAxis() {
             _super.apply(this, arguments);
-            this.UseDefaultHeight = true;
             this.Height = 0;
             this.Type = XAxisType.Date;
             this.TickSelection = XAxisDateTickSelection.Day;
@@ -370,7 +379,6 @@ define(["require", "exports"], function (require, exports) {
         __extends(FChartYAxis, _super);
         function FChartYAxis() {
             _super.apply(this, arguments);
-            this.UseDefaultWidth = true;
             this.Width = 0;
             this.Title = new FChartYAxisTitle();
             this.Layout = YAxisLayout.Left;
@@ -509,10 +517,15 @@ define(["require", "exports"], function (require, exports) {
         }
         return KeyValuePair;
     }());
-    //class Point {
-    //    public X: number = 0;
-    //    public Y: number = 0;
-    //}
+    var Size = (function () {
+        function Size(w, h) {
+            this.Width = 0;
+            this.Height = 0;
+            this.Width = w;
+            this.Height = h;
+        }
+        return Size;
+    }());
     var FChartDataSerie = (function (_super) {
         __extends(FChartDataSerie, _super);
         function FChartDataSerie() {
@@ -799,13 +812,137 @@ define(["require", "exports"], function (require, exports) {
         function FChartLegend() {
             _super.apply(this, arguments);
             this.Layout = LegendLayout.Right;
+            this.ContentLayout = LegendContentLayout.Vertical;
             this.Width = 0;
             this.Height = 0;
             this.MinWidth = 20;
             this.MinHeight = 10;
-            this.MaxShapeWidth = 20;
             this.ShapeWidth = 0;
+            this.LabelWidth = 0;
+            this.LabelHeight = 0;
+            this.FontSizeW = 0;
+            this.FontSizeH = 0;
+            this.LargeTextW = "";
+            this.LargeTextH = "";
+            this.LEGEND_ITEM_MAX_WIDTH = 200;
+            this.LEGEND_ITEM_MAX_HEIGHT = 50;
+            this.MAX_SHAPE_WIDTH = 20;
+            this.HorizontalMeasured = false;
+            this.VerticalMeasured = false;
         }
+        FChartLegend.prototype.PredictWidth = function (chart, w) {
+            var dLegendItemWidth = Math.min(w, this.LEGEND_ITEM_MAX_WIDTH);
+            if (this.ContentLayout == LegendContentLayout.Horizontal) {
+                for (var i = 0; i < chart.DataSeries.length; i++) {
+                    if (chart.DataSeries[i].Show) {
+                        this.Width += dLegendItemWidth;
+                    }
+                }
+            }
+            else if (this.ContentLayout == LegendContentLayout.Vertical) {
+                this.Width = dLegendItemWidth;
+            }
+            // Measure.
+            this.ShapeWidth = Math.min(this.Width * 0.3, this.MAX_SHAPE_WIDTH);
+            var maxTextWidth = this.Width - this.MAX_SHAPE_WIDTH;
+            var biggestTextWidth = 0;
+            this.FontSizeW = this.FontSize;
+            for (var i = 0; i < chart.DataSeries.length; i++) {
+                var serie = chart.DataSeries[i];
+                if (!serie.Show) {
+                    continue;
+                }
+                var lbl = serie.Label;
+                var text = chart.CreateSVGTextElement();
+                var lx = 0;
+                var ly = 0;
+                var textID = "Legend-item-" + i.toString() + "-" + lbl;
+                FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), lbl, "start", this.FontFamily, this.FontStyle, this.FontSizeW.toString(), this.FontWeight);
+                var textInfo = chart.GetAppropriateFontSizeForText(text, this.FontSizeW, maxTextWidth);
+                if (textInfo.Value > biggestTextWidth) {
+                    biggestTextWidth = textInfo.Value;
+                    this.LargeTextW = lbl;
+                }
+                this.FontSizeW = this.FontSizeW > textInfo.Key ? textInfo.Key : this.FontSizeW;
+            }
+            this.LabelWidth = biggestTextWidth;
+            this.Width = this.ShapeWidth + this.LabelWidth;
+            this.HorizontalMeasured = true;
+        };
+        FChartLegend.prototype.PredictHeight = function (chart, h) {
+            var dLegendItemHeight = Math.min(h, this.LEGEND_ITEM_MAX_HEIGHT);
+            if (this.ContentLayout == LegendContentLayout.Horizontal) {
+                this.Height = dLegendItemHeight;
+            }
+            else if (this.ContentLayout == LegendContentLayout.Vertical) {
+                for (var i = 0; i < chart.DataSeries.length; i++) {
+                    if (chart.DataSeries[i].Show) {
+                        this.Height += dLegendItemHeight;
+                    }
+                }
+            }
+            // Measure.
+            var maxTextHeight = dLegendItemHeight;
+            var biggestTextHeight = 0;
+            this.FontSizeH = this.FontSize;
+            for (var i = 0; i < chart.DataSeries.length; i++) {
+                var serie = chart.DataSeries[i];
+                if (!serie.Show) {
+                    continue;
+                }
+                var lbl = serie.Label;
+                var text = chart.CreateSVGTextElement();
+                var lx = 0;
+                var ly = 0;
+                var textID = "Legend-item-" + i.toString() + "-" + lbl;
+                FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), lbl, "start", this.FontFamily, this.FontStyle, this.FontSizeH.toString(), this.FontWeight);
+                var textInfo = chart.GetAppropriateFontSizeForText(text, this.FontSizeW, maxTextHeight, false);
+                if (textInfo.Value > biggestTextHeight) {
+                    biggestTextHeight = textInfo.Value;
+                    this.LargeTextH = lbl;
+                }
+                this.FontSizeH = this.FontSizeH > textInfo.Key ? textInfo.Key : this.FontSizeH;
+            }
+            this.LabelHeight = biggestTextHeight;
+            this.Height = this.LabelHeight;
+            this.VerticalMeasured = true;
+        };
+        FChartLegend.prototype.CalculateSize = function (chart) {
+            var sz = new Size(0, 0);
+            if (!this.HorizontalMeasured || !this.VerticalMeasured) {
+                return;
+            }
+            this.FontSize = this.FontSizeW > this.FontSizeH ? this.FontSizeH : this.FontSizeW;
+            var textSize1 = chart.GetTextSize(this.LargeTextW, this.FontSize.toString(), this.FontFamily, this.FontStyle, this.FontWeight);
+            var textSize2 = chart.GetTextSize(this.LargeTextH, this.FontSize.toString(), this.FontFamily, this.FontStyle, this.FontWeight);
+            this.LabelWidth = textSize1.Width;
+            this.LabelHeight = textSize2.Height;
+            this.Width = 0;
+            var dLegendItemWidth = this.ShapeWidth + this.LabelWidth;
+            if (this.ContentLayout == LegendContentLayout.Horizontal) {
+                for (var i = 0; i < chart.DataSeries.length; i++) {
+                    if (chart.DataSeries[i].Show) {
+                        this.Width += dLegendItemWidth;
+                    }
+                }
+            }
+            else if (this.ContentLayout == LegendContentLayout.Vertical) {
+                this.Width = dLegendItemWidth;
+            }
+            this.Height = 0;
+            var dLegendItemHeight = this.LabelHeight;
+            if (this.ContentLayout == LegendContentLayout.Horizontal) {
+                this.Height = dLegendItemHeight;
+            }
+            else if (this.ContentLayout == LegendContentLayout.Vertical) {
+                for (var i = 0; i < chart.DataSeries.length; i++) {
+                    if (chart.DataSeries[i].Show) {
+                        this.Height += dLegendItemHeight;
+                    }
+                }
+            }
+            this.FontSize /= 1.5; // Leave some margin for box.
+        };
         FChartLegend.prototype.Draw = function (chart) {
             if (!this.Show) {
                 return;
@@ -829,29 +966,9 @@ define(["require", "exports"], function (require, exports) {
             var nSeriesCount = chart.GetVisibleDataSeriesCount();
             var itemWidth = this.Width;
             var itemHeight = this.Height / nSeriesCount;
-            this.ShapeWidth = Math.min(this.Width * 0.3, this.MaxShapeWidth);
+            this.ShapeWidth = Math.min(this.Width * 0.3, this.MAX_SHAPE_WIDTH);
             var maxTextWidth = this.Width - this.ShapeWidth;
-            // Measure.
-            var biggestTextWidth = 0;
-            for (var i = 0; i < chart.DataSeries.length; i++) {
-                var serie = chart.DataSeries[i];
-                if (!serie.Show) {
-                    continue;
-                }
-                var lbl = serie.Label;
-                var text = chart.CreateSVGTextElement();
-                var lx = 0;
-                var ly = 0;
-                var textID = "Legend-item-" + i.toString() + "-" + lbl;
-                FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), lbl, "start", this.FontFamily, this.FontStyle, this.FontSize.toString(), this.FontWeight);
-                var textInfo = chart.GetAppropriateFontSizeForText(text, this.FontSize, maxTextWidth);
-                if (textInfo.Value > biggestTextWidth) {
-                    biggestTextWidth = textInfo.Value;
-                }
-                this.FontSize = textInfo.Key;
-            }
             // Draw.
-            this.Width = this.ShapeWidth + biggestTextWidth;
             var rectOutline = chart.CreateSVGRectElement();
             FChartHelper.SetSVGRectAttributes(rectOutline, "legend-outline", "0", "0", this.Width.toString(), this.Height.toString(), "1", "blue");
             svgLegend.appendChild(rectOutline);
@@ -1182,10 +1299,6 @@ define(["require", "exports"], function (require, exports) {
             this.Legend = new FChartLegend();
             this.Zoom = 1.0;
             this.ZoomMode = ChartZoomMode.Center;
-            this.DefaultXAxisMargin = 10;
-            this.MaxXAxisMargin = 50;
-            this.MinChartWidth = 50;
-            this.MinChartHeight = 50;
             this.XAxisLeftMargin = 10;
             this.XAxisRightMargin = 50;
             this.XAxes = new Array();
@@ -1195,17 +1308,27 @@ define(["require", "exports"], function (require, exports) {
             this.Zoomable = true;
             this.SVGMeasure = null;
             this.m_arrSVG = new Array();
+            this.UseFixedYAxesWidth = false;
+            this.FixedYAxesWidth = 0;
+            this.FixedYAxesLengthType = LengthType.Value;
+            this.UseFixedXAxesHeight = false;
+            this.FixedXAxesHeight = 0;
+            this.FixedXAxesLengthType = LengthType.Percentage;
             this.ONE_DAY = 86400000;
             this.ONE_HOUR = 3600000;
             this.ONE_MINUTE = 60000;
             this.ONE_SECOND = 1000;
             this.ONE_MILLISECOND = 1;
+            this.MIN_CHART_WIDTH = 50;
+            this.MIN_CHART_HEIGHT = 50;
             this.ChartWidth = 0;
             this.ChartHeight = 0;
             this.PlotWidth = 0;
             this.PlotHeight = 0;
             this.MaxYAxisWidth = 100;
             this.MaxXAxisHeight = 100;
+            this.YAxisDefaultWidth = 80;
+            this.XAxisDefaultHeight = 80;
             this.SortedDataSeries = false;
             this.ShowScrollBar = false;
             this.GridX = new FChartGrid();
@@ -1402,7 +1525,7 @@ define(["require", "exports"], function (require, exports) {
             if (isNaN(w) || isNaN(h)) {
                 return false;
             }
-            if (w < this.MinChartWidth || h < this.MinChartHeight) {
+            if (w < this.MIN_CHART_WIDTH || h < this.MIN_CHART_HEIGHT) {
                 bValid = false;
             }
             return bValid;
@@ -1414,7 +1537,7 @@ define(["require", "exports"], function (require, exports) {
             }
             var w = divBindTo.clientWidth;
             var h = divBindTo.clientHeight;
-            return (new KeyValuePair(w, h));
+            return (new Size(w, h));
         };
         FChart.prototype.Render = function () {
             var _this = this;
@@ -1755,6 +1878,7 @@ define(["require", "exports"], function (require, exports) {
             return dDiff;
         };
         FChart.prototype.GetTickCount = function (averageDiff, max, min) {
+            averageDiff = Math.abs(averageDiff);
             var obj = null;
             var t1 = 0;
             var t2 = 0;
@@ -1955,6 +2079,75 @@ define(["require", "exports"], function (require, exports) {
             }
             return obj;
         };
+        FChart.prototype.CalculateXAxesHeight = function (h) {
+            var xAxesHeight = 0;
+            if (this.UseFixedXAxesHeight) {
+                this.FixedXAxesHeight = Math.abs(this.FixedXAxesHeight);
+                if (this.FixedXAxesLengthType == LengthType.Percentage) {
+                    if (isNaN(this.FixedXAxesHeight) || this.FixedXAxesHeight <= 0 || this.FixedXAxesHeight > 1) {
+                        this.FixedXAxesHeight = 0.5;
+                    }
+                    xAxesHeight = this.ChartWidth * this.FixedXAxesHeight;
+                }
+                else if (this.FixedXAxesLengthType == LengthType.Value) {
+                    if (this.FixedXAxesHeight > this.ChartHeight) {
+                        this.FixedXAxesHeight = this.ChartHeight;
+                    }
+                    xAxesHeight = this.FixedXAxesHeight;
+                }
+            }
+            else {
+                var nCount = this.GetDisplayXAxesCount();
+                var predictHeight = this.XAxisDefaultHeight * nCount;
+                var maxHeight = 0;
+                if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
+                    maxHeight = h * 0.3;
+                }
+                else {
+                    maxHeight = h * 0.5;
+                }
+                if (predictHeight > maxHeight) {
+                    predictHeight = maxHeight;
+                }
+                xAxesHeight = predictHeight;
+            }
+            return xAxesHeight;
+        };
+        FChart.prototype.CalculateYAxesWidth = function (w) {
+            var yAxesWidth = 0;
+            if (this.UseFixedYAxesWidth) {
+                var wYAxes = 0;
+                this.FixedYAxesWidth = Math.abs(this.FixedYAxesWidth);
+                if (this.FixedYAxesLengthType == LengthType.Percentage) {
+                    if (isNaN(this.FixedYAxesWidth) || this.FixedYAxesWidth <= 0 || this.FixedYAxesWidth > 1) {
+                        this.FixedYAxesWidth = 0.5;
+                    }
+                    yAxesWidth = this.ChartWidth * this.FixedYAxesWidth;
+                }
+                else if (this.FixedYAxesLengthType == LengthType.Value) {
+                    if (this.FixedYAxesWidth > this.ChartWidth) {
+                        this.FixedYAxesWidth = this.ChartWidth;
+                    }
+                    yAxesWidth = this.FixedYAxesWidth;
+                }
+            }
+            else {
+                var nCount = this.GetDisplayYAxesCount();
+                var predictWidth = this.YAxisDefaultWidth * nCount;
+                var maxWidth = 0;
+                if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
+                    maxWidth = w * 0.3;
+                }
+                else {
+                    maxWidth = w * 0.5;
+                }
+                if (predictWidth > maxWidth) {
+                    predictWidth = maxWidth;
+                }
+                yAxesWidth = predictWidth;
+            }
+            return yAxesWidth;
+        };
         FChart.prototype.CalculateChartSize = function () {
             var bRet = false;
             var divBind = document.getElementById(this.BindTo);
@@ -1976,54 +2169,55 @@ define(["require", "exports"], function (require, exports) {
             return bRet;
         };
         FChart.prototype.CalculatePartsSize = function () {
-            var nMaxYAxisWidth = 100;
-            for (var i = 0; i < this.YAxes.length; i++) {
-                var yaxis = this.YAxes[i];
-                if (!yaxis.Show) {
-                    continue;
-                }
-                if (yaxis.UseDefaultWidth) {
-                    yaxis.Width = Math.min(this.ChartWidth * 0.1, this.MaxYAxisWidth);
-                    yaxis.Tick.Width = yaxis.Width * 0.2;
-                }
-            }
-            var nMaxXAxisHeight = 100;
-            for (var i = 0; i < this.XAxes.length; i++) {
-                var xaxis = this.XAxes[i];
-                if (!xaxis.Show) {
-                    continue;
-                }
-                if (xaxis.UseDefaultHeight) {
-                    xaxis.Height = Math.min(this.ChartHeight * 0.125, this.MaxXAxisHeight);
-                    xaxis.Tick.Height = xaxis.Height * 0.2;
-                }
-            }
-            var nLegendItemWidth = Math.min(this.ChartWidth * 0.3, 150);
-            var nLegendItemHeight = Math.min(this.ChartHeight * 0.2, 18);
-            this.Legend.Width = this.DataSeries.length * nLegendItemWidth;
-            this.Legend.Height = this.DataSeries.length * nLegendItemHeight;
-            var nSubtractWidth = 0;
-            var nSubtractHeight = 0;
+            var dYAxesWidth = 0;
+            var dPlotWidth = 0;
+            var yAxesWidth = this.CalculateYAxesWidth(this.ChartWidth);
+            var nCountY = this.GetDisplayYAxesCount();
+            var yw = yAxesWidth / nCountY;
             for (var i = 0; i < this.YAxes.length; i++) {
                 if (this.YAxes[i].Show) {
-                    nSubtractWidth += this.YAxes[i].Width;
+                    this.YAxes[i].Width = yw;
+                    this.YAxes[i].Tick.Width = yw * 0.2;
                 }
             }
+            var xAxesHeight = this.CalculateXAxesHeight(this.ChartHeight);
+            var nCountX = this.GetDisplayXAxesCount();
+            var xh = xAxesHeight / nCountX;
             for (var i = 0; i < this.XAxes.length; i++) {
                 if (this.XAxes[i].Show) {
-                    nSubtractHeight += this.XAxes[i].Height;
+                    this.XAxes[i].Height = xh;
+                    this.XAxes[i].Tick.Height = xh * 0.2;
                 }
             }
-            if (this.Legend.Show) {
-                if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
-                    nSubtractWidth += this.Legend.Width;
-                }
-                if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
-                    nSubtractHeight += this.Legend.Height;
-                }
+            if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
+                var w = this.ChartWidth - yAxesWidth;
+                var h = this.ChartHeight - xAxesHeight;
+                this.Legend.PredictWidth(this, w * 0.3);
+                this.Legend.PredictHeight(this, h);
+                this.Legend.CalculateSize(this);
+                this.PlotWidth = this.ChartWidth - yAxesWidth - this.Legend.Width;
+                this.PlotHeight = this.ChartHeight - xAxesHeight;
             }
-            this.PlotWidth = this.ChartWidth - nSubtractWidth;
-            this.PlotHeight = this.ChartHeight - nSubtractHeight;
+            else if (this.Legend.Layout == LegendLayout.InnerLeft || this.Legend.Layout == LegendLayout.InnerRight) {
+                this.PlotWidth = this.ChartWidth - yAxesWidth;
+                this.PlotHeight = this.ChartHeight - xAxesHeight;
+                this.Legend.PredictWidth(this, this.PlotWidth * 0.3);
+                this.Legend.PredictHeight(this, this.PlotHeight);
+            }
+            else if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
+                var w = this.ChartWidth - yAxesWidth;
+                var h = this.ChartHeight - xAxesHeight;
+                this.Legend.PredictWidth(this, w);
+                this.Legend.PredictHeight(this, h * 0.3);
+                this.PlotWidth = this.ChartWidth - yAxesWidth;
+                this.PlotHeight = this.ChartHeight - xAxesHeight - this.Legend.Height;
+            }
+            else if (this.Legend.Layout == LegendLayout.InnerTop || this.Legend.Layout == LegendLayout.InnerBottom) {
+                this.PlotWidth = this.ChartWidth - yAxesWidth;
+                this.PlotHeight = this.ChartHeight - xAxesHeight;
+                this.Legend.PredictWidth(this, this.PlotWidth);
+                this.Legend.PredictHeight(this, this.PlotHeight * 0.3);
+            }
             this.m_width = this.PlotWidth;
             this.m_height = this.PlotHeight;
             if (this.XAxisMargin > 0) {
@@ -2032,14 +2226,8 @@ define(["require", "exports"], function (require, exports) {
             this.SetWindow();
         };
         FChart.prototype.CalculatePartsPosition = function () {
-            var nDisplayXAxesCount = 0;
-            var xaxis = null;
-            for (var i = 0; i < this.XAxes.length; i++) {
-                if (this.XAxes[i].Show) {
-                    nDisplayXAxesCount++;
-                    xaxis = this.XAxes[i];
-                }
-            }
+            var nDisplayXAxesCount = this.GetDisplayXAxesCount();
+            var xaxis = this.GetXAxis();
             var lyaxes = new Array();
             var ryaxes = new Array();
             for (var i = 0; i < this.YAxes.length; i++) {
@@ -2323,8 +2511,7 @@ define(["require", "exports"], function (require, exports) {
             };
             var this_1 = this;
             for (var i = 0; i < this.XAxes.length; i++) {
-                var state_1 = _loop_1(i);
-                if (state_1 === "continue") continue;
+                _loop_1(i);
             }
         };
         FChart.prototype.CalculateDataPointCoordinate = function () {
@@ -2499,15 +2686,12 @@ define(["require", "exports"], function (require, exports) {
             if (!this.ValidateContainerSize()) {
                 return;
             }
-            var size = this.GetContainerSize();
-            if (FChartHelper.ObjectIsNullOrEmpty(size)) {
+            var sz = this.GetContainerSize();
+            if (this.ContainerWidth == sz.Width && this.ContainerHeight == sz.Height) {
                 return;
             }
-            if (this.ContainerWidth == size.Key && this.ContainerHeight == size.Value) {
-                return;
-            }
-            this.ContainerWidth = size.Key;
-            this.ContainerHeight = size.Value;
+            this.ContainerWidth = sz.Width;
+            this.ContainerHeight = sz.Height;
             this.SetCoordinate();
             this.Draw();
         };
@@ -2520,21 +2704,45 @@ define(["require", "exports"], function (require, exports) {
         };
         FChart.prototype.OnClick = function (e) {
         };
-        FChart.prototype.GetAppropriateFontSizeForText = function (text, fontSize, maxTextWidth) {
+        FChart.prototype.GetAppropriateFontSizeForText = function (text, fontSize, space, bHorizontal) {
+            if (bHorizontal === void 0) { bHorizontal = true; }
             var textInfo = null;
             this.SVGMeasure.appendChild(text);
             var rightfontSize = fontSize;
             var labelBox = text.getBBox();
-            if (labelBox.width > maxTextWidth) {
-                while (labelBox.width > maxTextWidth && rightfontSize > 0) {
-                    rightfontSize--;
-                    text.setAttribute("font-size", rightfontSize.toString());
-                    labelBox = text.getBBox();
+            if (bHorizontal) {
+                if (labelBox.width > space) {
+                    while (labelBox.width > space && rightfontSize > 0) {
+                        rightfontSize--;
+                        text.setAttribute("font-size", rightfontSize.toString());
+                        labelBox = text.getBBox();
+                    }
                 }
+                textInfo = new KeyValuePair(rightfontSize, labelBox.width);
             }
-            textInfo = new KeyValuePair(rightfontSize, labelBox.width);
+            else {
+                if (labelBox.height > space) {
+                    while (labelBox.height > space && rightfontSize > 0) {
+                        rightfontSize--;
+                        text.setAttribute("font-size", rightfontSize.toString());
+                        labelBox = text.getBBox();
+                    }
+                }
+                textInfo = new KeyValuePair(rightfontSize, labelBox.height);
+            }
             this.SVGMeasure.removeChild(text);
             return textInfo;
+        };
+        FChart.prototype.GetTextSize = function (lbl, fontSize, fontFamily, fontStyle, fontWeight) {
+            var sz = new Size(0, 0);
+            var text = this.CreateSVGTextElement();
+            FChartHelper.SetSVGTextAttributes(text, "text-1", "0", "0", lbl, "start", fontFamily, fontStyle, fontSize, fontWeight);
+            this.SVGMeasure.appendChild(text);
+            var labelBox = text.getBBox();
+            sz.Width = labelBox.width;
+            sz.Height = labelBox.height;
+            this.SVGMeasure.removeChild(text);
+            return sz;
         };
         FChart.prototype.CreateSVGLineElement = function () {
             var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
