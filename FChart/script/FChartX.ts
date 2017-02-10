@@ -1015,18 +1015,13 @@
             let svgPlot: SVGSVGElement = chart.GetPlotSVG();
             let plotWidth = svgPlot.clientWidth;
             let plotHeight = svgPlot.clientHeight;
-            let nSeriesCount = chart.GetVisibleDataSeriesCount();
-            let itemWidth = this.Width;
-            let itemHeight = this.Height / nSeriesCount;
-            this.ShapeWidth = Math.min(this.Width * 0.3, this.MAX_SHAPE_WIDTH);
-            let maxTextWidth: number = this.Width - this.ShapeWidth;
 
             // Draw.
             let rectOutline: SVGRectElement = chart.CreateSVGRectElement();
             FChartHelper.SetSVGRectAttributes(rectOutline, "legend-outline", "0", "0", this.Width.toString(), this.Height.toString(), "1", "blue");
             svgLegend.appendChild(rectOutline);
 
-            let sixthOfH = itemHeight / 6;
+            let sixthOfH = this.LabelHeight / 6;
             let fifthOfW = this.ShapeWidth / 5;
 
             let yStart: number = 0;
@@ -1049,7 +1044,7 @@
                 if (!FChartHelper.ObjectIsNullOrEmpty(serie.Mark)) {
                     let mark: ChartMark = $.extend(true, {}, serie.Mark);
                     let mx = this.ShapeWidth / 2;
-                    let my = yStart + itemHeight / 2;
+                    let my = yStart + this.LabelHeight / 2;
                     mark.AttatchTo = MarkAttachTo.Legend;
                     mark.Rotation = 0;
                     mark.X = mx;
@@ -1066,12 +1061,12 @@
                 let lbl: string = serie.Label;
                 let text: SVGTextElement = chart.CreateSVGTextElement();
                 let lx: number = this.ShapeWidth;
-                let ly = yStart + itemHeight / 2 + this.FontSize / 2 - this.FontSize * 0.3 / 2;
+                let ly = yStart + this.LabelHeight / 2 + this.FontSize / 2 - this.FontSize * 0.3 / 2;
                 let textID: string = "legend-item-" + i.toString() + "-" + lbl;
                 FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), lbl, "start", this.FontFamily, this.FontStyle, this.FontSize.toString(), this.FontWeight);
                 svgLegend.appendChild(text);
 
-                yStart += itemHeight;
+                yStart += this.LabelHeight;
             }
         };
     }

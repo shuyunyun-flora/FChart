@@ -963,16 +963,11 @@ define(["require", "exports"], function (require, exports) {
             var svgPlot = chart.GetPlotSVG();
             var plotWidth = svgPlot.clientWidth;
             var plotHeight = svgPlot.clientHeight;
-            var nSeriesCount = chart.GetVisibleDataSeriesCount();
-            var itemWidth = this.Width;
-            var itemHeight = this.Height / nSeriesCount;
-            this.ShapeWidth = Math.min(this.Width * 0.3, this.MAX_SHAPE_WIDTH);
-            var maxTextWidth = this.Width - this.ShapeWidth;
             // Draw.
             var rectOutline = chart.CreateSVGRectElement();
             FChartHelper.SetSVGRectAttributes(rectOutline, "legend-outline", "0", "0", this.Width.toString(), this.Height.toString(), "1", "blue");
             svgLegend.appendChild(rectOutline);
-            var sixthOfH = itemHeight / 6;
+            var sixthOfH = this.LabelHeight / 6;
             var fifthOfW = this.ShapeWidth / 5;
             var yStart = 0;
             for (var i = 0; i < chart.DataSeries.length; i++) {
@@ -992,7 +987,7 @@ define(["require", "exports"], function (require, exports) {
                 if (!FChartHelper.ObjectIsNullOrEmpty(serie.Mark)) {
                     var mark = $.extend(true, {}, serie.Mark);
                     var mx = this.ShapeWidth / 2;
-                    var my = yStart + itemHeight / 2;
+                    var my = yStart + this.LabelHeight / 2;
                     mark.AttatchTo = MarkAttachTo.Legend;
                     mark.Rotation = 0;
                     mark.X = mx;
@@ -1007,11 +1002,11 @@ define(["require", "exports"], function (require, exports) {
                 var lbl = serie.Label;
                 var text = chart.CreateSVGTextElement();
                 var lx = this.ShapeWidth;
-                var ly = yStart + itemHeight / 2 + this.FontSize / 2 - this.FontSize * 0.3 / 2;
+                var ly = yStart + this.LabelHeight / 2 + this.FontSize / 2 - this.FontSize * 0.3 / 2;
                 var textID = "legend-item-" + i.toString() + "-" + lbl;
                 FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), lbl, "start", this.FontFamily, this.FontStyle, this.FontSize.toString(), this.FontWeight);
                 svgLegend.appendChild(text);
-                yStart += itemHeight;
+                yStart += this.LabelHeight;
             }
         };
         ;
