@@ -161,8 +161,9 @@
         public Width: number = 6;
         public Height: number = 6;
         public AttatchTo: MarkAttachTo = MarkAttachTo.Plot;
-        public Draw(chart: FChart): void {
 
+        public Draw(chart: FChart): void {
+            
         }
     }
 
@@ -262,15 +263,16 @@
     }
 
     export class FChartTick extends ChartGraphObject {
-        IsXAxisTick: boolean = false;
-        MinIntervalSpace: number = 10;
-        LabelLayout: TickLabelLayout = TickLabelLayout.CenterOfTick;
-        LabelFormat: string = "";
-        Rotation: number = 0;
-        Width: number = 0;
-        Height: number = 0;
+        public IsXAxisTick: boolean = false;
+        public MinIntervalSpace: number = 20;
+        public LabelLayout: TickLabelLayout = TickLabelLayout.CenterOfTick;
+        public LabelFormat: string = "";
+        public Rotation: number = 0;
+        public Width: number = 0;
+        public Height: number = 0;
+        public ValueToFixed: number = 2;
 
-        Draw(chart: FChart): void { };
+        public Draw(chart: FChart): void { };
     }
 
     class DateTicksInfo {
@@ -305,7 +307,7 @@
             let xAxisLine: SVGLineElement = chart.CreateSVGLineElement();
             let x = 0;
             let y = this.LineWidth / 2;
-            let svg = chart.GetSVGSVGElementByID("svg-xaxis-" + this.ID);
+            let svg: SVGSVGElement = chart.GetSVGSVGElementByID("svg-xaxis-" + this.ID);
             if (chart.GetDisplayXAxesCount() == 1) {
                 svg = chart.GetSVGSVGElementByID("svg-xaxis-bottom");
             }
@@ -367,10 +369,10 @@
 
             let nXCount = chart.GetDisplayXAxesCount();
             let svg: SVGSVGElement = null;
-            let yStart = this.Height / 2.0;
+            let yStart: number = 0;
             if (nXCount == 1) {
                 svg = chart.GetSVGSVGElementByID("svg-xaxis-top");
-                yStart = 0;
+                yStart = this.Height / 4.0;
             }
             else {
                 svg = chart.GetSVGSVGElementByID("svg-xaxis-" + this.ID);
@@ -381,8 +383,14 @@
             }
 
             let dLabelFontSize = Math.abs(this.Title.FontSize);
-            let x = svg.clientWidth / 2;
-            let y = yStart + this.Height / 2.0 - dLabelFontSize * 0.125 - dLabelFontSize * 0.3 / 2;
+            let x: number = svg.clientWidth / 2;
+            let y: number = 0;
+            if (nXCount == 1) {
+                y = yStart + dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2;
+            }
+            else {
+                y = yStart + this.Height / 4.0 * 2 + dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2;
+            }
             let text: SVGTextElement = chart.CreateSVGTextElement();
             FChartHelper.SetSVGTextAttributes(text, "XAxis-" + this.ID + "-XLabel", x.toString(), y.toString(), this.Title.Label, "middle", this.Title.FontFamily, this.Title.FontStyle, this.Title.FontSize.toString(), this.Title.FontWeight);
             svg.appendChild(text);
@@ -408,11 +416,13 @@
             let svg = chart.GetSVGSVGElementByID("svg-yaxis-" + this.ID);
             let regionWidth = svg.clientWidth;
             let regionHeight = svg.clientHeight;
-            let x = regionWidth - this.LineWidth / 2;
-            let y = 0;
+            let x:number = regionWidth - this.LineWidth / 2;
+            let y:number = 0;
             let yAxisLine: SVGLineElement = chart.CreateSVGLineElement();
 
-
+            if (this.Layout == YAxisLayout.Right) {
+                x = this.LineWidth / 2;
+            }
             FChartHelper.SetSVGLineAttributes(yAxisLine, "yaxis-line" + this.ID, x.toString(), y.toString(), x.toString(), regionHeight.toString(), this.LineWidth.toString(), this.LineColor);
             svg.appendChild(yAxisLine);
 
@@ -434,9 +444,14 @@
                 let tickLine: SVGLineElement = chart.CreateSVGLineElement();
                 let tickLineId = "yaxis-tick-" + this.ID + "-" + iy.toString();
 
-                let x1 = regionWidth - tickLineW;
-                let x2 = regionWidth;
-                let y1 = iy;
+                let x1:number = regionWidth - tickLineW;
+                let x2: number = regionWidth;
+                if (this.Layout == YAxisLayout.Right) {
+                    x1 = 0;
+                    x2 = tickLineW;
+                }
+
+                let y1:number = iy;
                 if (i == 0) {
                     y1 -= this.Tick.LineWidth / 2;
                 }
@@ -450,23 +465,23 @@
 
                 if (value == "top" || value == "bottom") {
                     let envelopeLine: SVGLineElement = chart.CreateSVGLineElement();
-                    let svgChart = chart.GetSVGSVGElementByID("svg-plot");
+                    let svgPlot = chart.GetSVGSVGElementByID("svg-plot");
                     let ex1 = 0;
                     let ey1 = 0;
-                    let ex2 = svgChart.clientWidth;
+                    let ex2 = svgPlot.clientWidth;
                     let ey2 = 0;
                     if (value == "top") {
                         ey1 += this.Tick.LineWidth / 2;
                         ey2 += this.Tick.LineWidth / 2;
                     }
                     else if (value == "bottom") {
-                        ey1 = svgChart.clientHeight - this.Tick.LineWidth / 2;
-                        ey2 = svgChart.clientHeight - this.Tick.LineWidth / 2;
+                        ey1 = svgPlot.clientHeight - this.Tick.LineWidth / 2;
+                        ey2 = svgPlot.clientHeight - this.Tick.LineWidth / 2;
                     }
 
                     if (value == "top") {
                         FChartHelper.SetSVGLineAttributes(envelopeLine, "yaxis-envelopeline-" + this.ID, ex1.toString(), ey1.toString(), ex2.toString(), ey2.toString(), this.LineWidth.toString(), this.LineColor);
-                        svgChart.appendChild(envelopeLine);
+                        svgPlot.appendChild(envelopeLine);
                     }
                 }
 
@@ -489,12 +504,15 @@
                 }
 
                 lx = regionWidth - this.TickWidth - this.MarginBetweenTickAndLabel;
+                if (this.Layout == YAxisLayout.Right) {
+                    lx = this.TickWidth + this.MarginBetweenTickAndLabel;
+                }
                 ly = iy;
                 ly = ly + yTickLabelFontSize / 2 - yTickLabelFontSize * 0.3 / 2;
                 tickLabel.innerHTML = value;
                 tickLabel.setAttribute("x", lx.toString());
                 tickLabel.setAttribute("y", ly.toString());
-                FChartHelper.SetSVGTextAttributes(tickLabel, "yaxis-ticklabel-" + value, lx.toString(), ly.toString(), (value == "top" || value == "bottom") ? "" : value, "end", this.FontFamily, this.FontStyle, yTickLabelFontSize.toString(), this.FontWeight);
+                FChartHelper.SetSVGTextAttributes(tickLabel, "yaxis-ticklabel-" + value, lx.toString(), ly.toString(), (value == "top" || value == "bottom") ? "" : value, this.Layout == YAxisLayout.Left ? "end" : "start", this.FontFamily, this.FontStyle, yTickLabelFontSize.toString(), this.FontWeight);
                 svg.appendChild(tickLabel);
                 arrYTickLabels.push(tickLabel);
             }
@@ -521,8 +539,11 @@
             let regionHeight: number = svg.clientHeight;
 
             let dLabelFontSize = Math.abs(this.Title.FontSize);
-            let x = regionWidth - this.TickWidth - this.MaxTickLabelWidth - this.MarginBetweenTickAndLabel * 2;
-            let y = regionHeight / 2.0 + dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2;
+            let x:number = regionWidth - this.TickWidth - this.MaxTickLabelWidth - this.MarginBetweenTickAndLabel * 2;
+            if (this.Layout == YAxisLayout.Right) {
+                x = this.TickWidth + this.MaxTickLabelWidth + this.MarginBetweenTickAndLabel * 2;
+            }
+            let y:number = regionHeight / 2.0 + dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2;
             let text: SVGTextElement = chart.CreateSVGTextElement();
             let transform: string = "rotate(270," + x.toString() + "," + y.toString() + ")";
             FChartHelper.SetSVGTextAttributes(text, "yaxis-title-" + this.ID, x.toString(), y.toString(), this.Title.Label, "middle", this.Title.FontFamily, this.Title.FontStyle, this.Title.FontSize.toString(), this.Title.FontWeight, this.FontColor, transform);
@@ -854,13 +875,14 @@
         public LabelWidth: number = 0;
         public LabelHeight: number = 0;
 
+        private FontSizeDraw: number = 0;
         private FontSizeW: number = 0;
         private FontSizeH: number = 0;
         private LargeTextW: string = "";
         private LargeTextH: string = "";
-        private readonly LEGEND_ITEM_MAX_WIDTH: number = 200;
-        private readonly LEGEND_ITEM_MAX_HEIGHT: number = 50;
-        public MAX_SHAPE_WIDTH: number = 20;
+        private  LEGEND_ITEM_MAX_WIDTH: number = 200;
+        private  LEGEND_ITEM_MAX_HEIGHT: number = 50;
+        public MAX_SHAPE_WIDTH: number = 100;
         private HorizontalMeasured: boolean = false;
         private VerticalMeasured: boolean = false;
 
@@ -881,7 +903,7 @@
             this.ShapeWidth = Math.min(this.Width * 0.3, this.MAX_SHAPE_WIDTH);
             let maxTextWidth: number = this.Width - this.MAX_SHAPE_WIDTH;
             let biggestTextWidth: number = 0;
-            this.FontSizeW = this.FontSize;
+            this.FontSizeW = this.FontSize * 1.5;
 
             for (let i = 0; i < chart.DataSeries.length; i++) {
                 let serie: FChartDataSerie = chart.DataSeries[i];
@@ -925,7 +947,7 @@
             // Measure.
             let maxTextHeight: number = dLegendItemHeight;
             let biggestTextHeight: number = 0;
-            this.FontSizeH = this.FontSize;
+            this.FontSizeH = this.FontSize * 1.5;
 
             for (let i = 0; i < chart.DataSeries.length; i++) {
                 let serie: FChartDataSerie = chart.DataSeries[i];
@@ -959,9 +981,10 @@
                 return;
             }
 
-            this.FontSize = this.FontSizeW > this.FontSizeH ? this.FontSizeH : this.FontSizeW;
-            let textSize1: Size = chart.GetTextSize(this.LargeTextW, this.FontSize.toString(), this.FontFamily, this.FontStyle, this.FontWeight);
-            let textSize2: Size = chart.GetTextSize(this.LargeTextH, this.FontSize.toString(), this.FontFamily, this.FontStyle, this.FontWeight);
+            
+            let testFontSize: number = this.FontSizeW > this.FontSizeH ? this.FontSizeH : this.FontSizeW;
+            let textSize1: Size = chart.GetTextSize(this.LargeTextW, testFontSize.toString(), this.FontFamily, this.FontStyle, this.FontWeight);
+            let textSize2: Size = chart.GetTextSize(this.LargeTextH, testFontSize.toString(), this.FontFamily, this.FontStyle, this.FontWeight);
             this.LabelWidth = textSize1.Width;
             this.LabelHeight = textSize2.Height;
 
@@ -991,10 +1014,13 @@
                 }
             }
 
-            this.FontSize /= 1.5;                       // Leave some margin for box.
+            this.FontSizeDraw = this.FontSize;
+            if (this.FontSize > testFontSize) {
+                this.FontSizeDraw = testFontSize;
+            }
         }
 
-        Draw(chart: FChart): void {
+        public Draw(chart: FChart): void {
             if (!this.Show) {
                 return;
             }
@@ -1025,6 +1051,7 @@
             let fifthOfW = this.ShapeWidth / 5;
 
             let yStart: number = 0;
+            let xStart: number = 0;
             for (let i = 0; i < chart.DataSeries.length; i++) {
                 let serie: FChartDataSerie = chart.DataSeries[i];
                 if (!serie.Show) {
@@ -1032,9 +1059,9 @@
                 }
 
                 let line: SVGLineElement = chart.CreateSVGLineElement();
-                let x1: number = fifthOfW;
+                let x1: number = xStart + fifthOfW;
                 let y1: number = yStart + sixthOfH * 3;
-                let x2: number = fifthOfW * 4;
+                let x2: number = xStart + fifthOfW * 4;
                 let y2: number = yStart + sixthOfH * 3;
                 let lineID: string = "legend-item-line-" + serie.XAxisID + "-" + serie.YAxisID;
                 let lineThick = sixthOfH * 2;
@@ -1043,32 +1070,47 @@
 
                 if (!FChartHelper.ObjectIsNullOrEmpty(serie.Mark)) {
                     let mark: ChartMark = $.extend(true, {}, serie.Mark);
-                    let mx = this.ShapeWidth / 2;
+                    let mx = xStart + this.ShapeWidth / 2;
                     let my = yStart + this.LabelHeight / 2;
                     mark.AttatchTo = MarkAttachTo.Legend;
                     mark.Rotation = 0;
                     mark.X = mx;
                     mark.Y = my;
-                    mark.Width = fifthOfW * 3;
-                    mark.Height = sixthOfH * 4;
-                    if (typeof (mark) == "CircleMark") {
+                    mark.Width = fifthOfW;
+                    mark.Height = sixthOfH * 3;
+                    if (serie.Mark instanceof CircleMark) {
                         (mark as CircleMark).Radius = sixthOfH * 2;
                     }
-
                     mark.Draw(chart);
                 }
 
                 let lbl: string = serie.Label;
                 let text: SVGTextElement = chart.CreateSVGTextElement();
-                let lx: number = this.ShapeWidth;
-                let ly = yStart + this.LabelHeight / 2 + this.FontSize / 2 - this.FontSize * 0.3 / 2;
+                let lx: number = xStart + this.ShapeWidth;
+                let ly = yStart + this.LabelHeight / 2 + this.FontSizeDraw / 2 - this.FontSizeDraw * 0.3 / 2;
                 let textID: string = "legend-item-" + i.toString() + "-" + lbl;
-                FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), lbl, "start", this.FontFamily, this.FontStyle, this.FontSize.toString(), this.FontWeight);
+                FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), lbl, "start", this.FontFamily, this.FontStyle, this.FontSizeDraw.toString(), this.FontWeight);
                 svgLegend.appendChild(text);
 
-                yStart += this.LabelHeight;
+                if (this.ContentLayout == LegendContentLayout.Vertical) {
+                    yStart += this.LabelHeight;
+                }
+                else if (this.ContentLayout == LegendContentLayout.Horizontal) {
+                    xStart += (this.ShapeWidth + this.LabelWidth);
+                }
             }
         };
+
+        public ResetIndirectVariables(): void {
+            this.FontSizeW = 0;
+            this.FontSizeH = 0;
+            this.LargeTextW = "";
+            this.LargeTextH = "";
+            this.HorizontalMeasured = false;
+            this.VerticalMeasured = false;
+            this.LabelWidth = 0;
+            this.LabelHeight = 0;
+        }
     }
 
     class FloatPoint {
@@ -1439,14 +1481,14 @@
         public FixedXAxesHeight: number = 0;
         public FixedXAxesLengthType: LengthType = LengthType.Percentage;
 
-        private readonly ONE_DAY: number = 86400000;
-        private readonly ONE_HOUR: number = 3600000;
-        private readonly ONE_MINUTE: number = 60000;
-        private readonly ONE_SECOND: number = 1000;
-        private readonly ONE_MILLISECOND: number = 1;
+        private  ONE_DAY: number = 86400000;
+        private  ONE_HOUR: number = 3600000;
+        private  ONE_MINUTE: number = 60000;
+        private  ONE_SECOND: number = 1000;
+        private  ONE_MILLISECOND: number = 1;
 
-        private readonly MIN_CHART_WIDTH: number = 50;
-        private readonly MIN_CHART_HEIGHT: number = 50;
+        private  MIN_CHART_WIDTH: number = 50;
+        private  MIN_CHART_HEIGHT: number = 50;
 
         private ChartWidth: number = 0;
         private ChartHeight: number = 0;
@@ -2486,12 +2528,14 @@
                 this.PlotHeight = this.ChartHeight - xAxesHeight;
                 this.Legend.PredictWidth(this, this.PlotWidth * 0.3);
                 this.Legend.PredictHeight(this, this.PlotHeight);
+                this.Legend.CalculateSize(this);
             }
             else if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
                 let w: number = this.ChartWidth - yAxesWidth;
                 let h: number = this.ChartHeight - xAxesHeight;
                 this.Legend.PredictWidth(this, w);
                 this.Legend.PredictHeight(this, h * 0.3);
+                this.Legend.CalculateSize(this);
 
                 this.PlotWidth = this.ChartWidth - yAxesWidth;
                 this.PlotHeight = this.ChartHeight - xAxesHeight - this.Legend.Height;
@@ -2501,6 +2545,7 @@
                 this.PlotHeight = this.ChartHeight - xAxesHeight;
                 this.Legend.PredictWidth(this, this.PlotWidth);
                 this.Legend.PredictHeight(this, this.PlotHeight * 0.3);
+                this.Legend.CalculateSize(this);
             }
 
             this.m_width = this.PlotWidth;
@@ -2704,15 +2749,17 @@
                     yaxis.Value2Wc.push({ Key: "bottom", Value: y });
                 }
 
+                yaxis.Value2Wc = new Array<KeyValuePair<string, number>>();
                 let y1 = reserveTopSpace;
                 for (let p = nYTicksCount; p >= 0; p--) {
                     if (p % iMultiple != 0) {
                         continue;
                     }
-                    let value = p * smallScale;
-                    let yd = y1 + ((nYTicksCount - p) * smallScale) * yPixelsPerValue;
-                    let y = this.m_coeff.ToWcY(yd);
-                    yaxis.Value2Wc.push({ Key: value.toString(), Value: y });
+                    let value:number = p * smallScale;
+                    let yd:number = y1 + ((nYTicksCount - p) * smallScale) * yPixelsPerValue;
+                    let y: number = this.m_coeff.ToWcY(yd);
+                    let strLabel: string = value.toFixed(yaxis.Tick.ValueToFixed);
+                    yaxis.Value2Wc.push({ Key: strLabel, Value: y });
                 }
 
                 if (yaxis.TopEnvelopeLine.Show) {
@@ -2788,6 +2835,7 @@
                 let nTicksCount: number = 0;
                 let obj2: DateTicksInfo = null;
 
+                xaxis.Value2Wc = new Array<KeyValuePair<string, number>>();
                 if (xaxis.Type == XAxisType.Number || (xaxis.Type == XAxisType.Date && xaxis.TickSelection == XAxisDateTickSelection.DateAsNumber)) {
                     maxAverageDiff = this.GetXAxisAverageDiff(xaxis.ID);
                     let obj: NumberTicksInfo = this.GetXAxisTickCount(xaxis.ID, maxAverageDiff, maxX, minX, this.m_width);
@@ -2810,13 +2858,12 @@
 
                 if (iType == 0) {
                     for (let p = 0; p <= nTicksCount; p++) {
-                        let dValue = p * xaxis.Scale;
-                        let xd = dValue * xaxis.PixelsPerValue;
-                        let x = this.m_coeff.ToWcX(xd);
-                        xaxis.Value2Wc.push({ Key: dValue.toString(), Value: x });
-                        length++;
+                        let dValue: number = p * xaxis.Scale;
+                        let xd: number = dValue * xaxis.PixelsPerValue;
+                        let x: number = this.m_coeff.ToWcX(xd);
+                        let strLabel: string = dValue.toFixed(xaxis.Tick.ValueToFixed);
+                        xaxis.Value2Wc.push({ Key: strLabel, Value: x });
                     }
-                    xaxis.Value2Wc.length = length;
                 }
                 else if (iType == 1) {
                     for (let p = 0; p < obj2.Ticks.length; p++) {
@@ -2824,9 +2871,7 @@
                         let xd = dValue * xPixelsPerValue;
                         let x = this.m_coeff.ToWcX(xd);
                         xaxis.Value2Wc.push({ Key: dValue.toString(), Value: x });
-                        length++;
                     }
-                    xaxis.Value2Wc.length = length;
                 }
             }
         }
@@ -2879,7 +2924,7 @@
             for (let i = 0; i < this.YAxes.length; i++) {
                 if (this.YAxes[i].Show) {
                     let yaxis: FChartYAxis = this.YAxes[i];
-                    let svgY = this.CreateSVG("svg-yaxis-" + yaxis.ID, "absolute", yaxis.X.toString(), yaxis.Y.toString(), yaxis.Width.toString(), this.m_height.toString());
+                    let svgY: SVGSVGElement = this.CreateSVG("svg-yaxis-" + yaxis.ID, "absolute", yaxis.X.toString(), yaxis.Y.toString(), yaxis.Width.toString(), this.m_height.toString());
                     divContainer.appendChild(svgY);
                     this.m_arrSVG.push(svgY);
                 }
@@ -2891,7 +2936,7 @@
 
             let nXCount = this.GetDisplayXAxesCount();
             if (nXCount == 1) {
-                let xaxis = this.GetXAxis();
+                let xaxis: FChartXAxis = this.GetXAxis();
                 let svgTop: SVGSVGElement = this.CreateSVG("svg-xaxis-top", "absolute", this.PlotPartX.toString(), "0", this.PlotWidth.toString(), (xaxis.Height / 2).toString());
                 divContainer.appendChild(svgTop);
                 this.m_arrSVG.push(svgTop);
@@ -2903,19 +2948,19 @@
             }
             else {
                 for (let i = 0; i < this.XAxes.length; i++) {
-                    let xaxis = this.XAxes[i];
+                    let xaxis: FChartXAxis = this.XAxes[i];
                     if (!xaxis.Show) {
                         continue;
                     }
 
-                    let svgX = this.CreateSVG("svg-xaxis" + xaxis.ID, "absolute", xaxis.X.toString(), xaxis.Y.toString(), this.PlotWidth.toString(), xaxis.Height.toString());
+                    let svgX: SVGSVGElement = this.CreateSVG("svg-xaxis-" + xaxis.ID, "absolute", xaxis.X.toString(), xaxis.Y.toString(), this.PlotWidth.toString(), xaxis.Height.toString());
                     divContainer.appendChild(svgX);
                     this.m_arrSVG.push(svgX);
                 }
             }
 
             if (this.Legend.Show) {
-                let svgLegend = this.CreateSVG("svg-legend", "absolute", this.Legend.X.toString(), this.Legend.Y.toString(), this.Legend.Width.toString(), this.Legend.Height.toString());
+                let svgLegend: SVGSVGElement = this.CreateSVG("svg-legend", "absolute", this.Legend.X.toString(), this.Legend.Y.toString(), this.Legend.Width.toString(), this.Legend.Height.toString());
                 divContainer.appendChild(svgLegend);
                 this.m_arrSVG.push(svgLegend);
             }

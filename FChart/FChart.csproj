@@ -170,6 +170,7 @@
   <ItemGroup>
     <TypeScriptCompile Include="config.ts" />
     <TypeScriptCompile Include="lib\PubSub.ts" />
+    <TypeScriptCompile Include="script\app.ts" />
     <TypeScriptCompile Include="script\FChartX.ts" />
     <TypeScriptCompile Include="typings\jquery.d.ts" />
     <TypeScriptCompile Include="typings\jquery.ui.datetimepicker.d.ts" />

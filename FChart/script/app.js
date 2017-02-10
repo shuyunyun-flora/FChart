@@ -14,8 +14,18 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         xaxis1.Title.Show = true;
         xaxis1.Title.FontSize = 11;
         xaxis1.Title.Layout = FChartX.XAxisTitleLayout.TopMiddle;
-        xaxis1.Title.Label = "X axis Title";
+        xaxis1.Title.Label = "X axis Title 1";
         chart.XAxes.push(xaxis1);
+        var xaxis2 = new FChartX.FChartXAxis();
+        xaxis2.Show = true;
+        xaxis2.ID = "XAxis-2";
+        xaxis2.Type = FChartX.XAxisType.Number;
+        xaxis2.Title = new FChartX.FChartXAxisTitle();
+        xaxis2.Title.Show = true;
+        xaxis2.Title.FontSize = 11;
+        xaxis2.Title.Layout = FChartX.XAxisTitleLayout.TopMiddle;
+        xaxis2.Title.Label = "X axis Title 2";
+        chart.XAxes.push(xaxis2);
         var yaxis1 = new FChartX.FChartYAxis();
         yaxis1.Show = true;
         yaxis1.ID = "YAxis-1";
@@ -31,7 +41,7 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         yaxis2.Show = true;
         yaxis2.ID = "YAxis-2";
         yaxis2.Order = 2;
-        yaxis2.Layout = FChartX.YAxisLayout.Left;
+        yaxis2.Layout = FChartX.YAxisLayout.Right;
         yaxis2.Title = new FChartX.FChartYAxisTitle();
         yaxis2.Title.Show = true;
         yaxis2.Title.Layout = FChartX.YAxisTitleLayout.Center;
@@ -39,6 +49,8 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         yaxis2.Title.Label = "Y axis Title 2";
         chart.YAxes.push(yaxis2);
         chart.Legend.Show = true;
+        chart.Legend.Layout = FChartX.LegendLayout.InnerRight;
+        chart.Legend.ContentLayout = FChartX.LegendContentLayout.Vertical;
         var serie1 = new FChartX.FChartDataSerie();
         serie1.XAxisID = xaxis1.ID;
         serie1.YAxisID = yaxis1.ID;
@@ -56,7 +68,7 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         serie1.Mark.Rotation = 70;
         serie1.Label = "样条线一";
         var serie2 = new FChartX.FChartDataSerie();
-        serie2.XAxisID = xaxis1.ID;
+        serie2.XAxisID = xaxis2.ID;
         serie2.YAxisID = yaxis2.ID;
         serie2.LineWidth = 1;
         serie2.LineColor = "magenta";

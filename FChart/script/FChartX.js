@@ -255,12 +255,13 @@ define(["require", "exports"], function (require, exports) {
         function FChartTick() {
             _super.apply(this, arguments);
             this.IsXAxisTick = false;
-            this.MinIntervalSpace = 10;
+            this.MinIntervalSpace = 20;
             this.LabelLayout = TickLabelLayout.CenterOfTick;
             this.LabelFormat = "";
             this.Rotation = 0;
             this.Width = 0;
             this.Height = 0;
+            this.ValueToFixed = 2;
         }
         FChartTick.prototype.Draw = function (chart) { };
         ;
@@ -354,10 +355,10 @@ define(["require", "exports"], function (require, exports) {
             }
             var nXCount = chart.GetDisplayXAxesCount();
             var svg = null;
-            var yStart = this.Height / 2.0;
+            var yStart = 0;
             if (nXCount == 1) {
                 svg = chart.GetSVGSVGElementByID("svg-xaxis-top");
-                yStart = 0;
+                yStart = this.Height / 4.0;
             }
             else {
                 svg = chart.GetSVGSVGElementByID("svg-xaxis-" + this.ID);
@@ -367,7 +368,13 @@ define(["require", "exports"], function (require, exports) {
             }
             var dLabelFontSize = Math.abs(this.Title.FontSize);
             var x = svg.clientWidth / 2;
-            var y = yStart + this.Height / 2.0 - dLabelFontSize * 0.125 - dLabelFontSize * 0.3 / 2;
+            var y = 0;
+            if (nXCount == 1) {
+                y = yStart + dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2;
+            }
+            else {
+                y = yStart + this.Height / 4.0 * 2 + dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2;
+            }
             var text = chart.CreateSVGTextElement();
             FChartHelper.SetSVGTextAttributes(text, "XAxis-" + this.ID + "-XLabel", x.toString(), y.toString(), this.Title.Label, "middle", this.Title.FontFamily, this.Title.FontStyle, this.Title.FontSize.toString(), this.Title.FontWeight);
             svg.appendChild(text);
@@ -398,6 +405,9 @@ define(["require", "exports"], function (require, exports) {
             var x = regionWidth - this.LineWidth / 2;
             var y = 0;
             var yAxisLine = chart.CreateSVGLineElement();
+            if (this.Layout == YAxisLayout.Right) {
+                x = this.LineWidth / 2;
+            }
             FChartHelper.SetSVGLineAttributes(yAxisLine, "yaxis-line" + this.ID, x.toString(), y.toString(), x.toString(), regionHeight.toString(), this.LineWidth.toString(), this.LineColor);
             svg.appendChild(yAxisLine);
             var oneFifth = this.Width / 2 * 0.2;
@@ -418,6 +428,10 @@ define(["require", "exports"], function (require, exports) {
                 var tickLineId = "yaxis-tick-" + this.ID + "-" + iy.toString();
                 var x1 = regionWidth - tickLineW;
                 var x2 = regionWidth;
+                if (this.Layout == YAxisLayout.Right) {
+                    x1 = 0;
+                    x2 = tickLineW;
+                }
                 var y1 = iy;
                 if (i == 0) {
                     y1 -= this.Tick.LineWidth / 2;
@@ -430,22 +444,22 @@ define(["require", "exports"], function (require, exports) {
                 svg.appendChild(tickLine);
                 if (value == "top" || value == "bottom") {
                     var envelopeLine = chart.CreateSVGLineElement();
-                    var svgChart = chart.GetSVGSVGElementByID("svg-plot");
+                    var svgPlot = chart.GetSVGSVGElementByID("svg-plot");
                     var ex1 = 0;
                     var ey1 = 0;
-                    var ex2 = svgChart.clientWidth;
+                    var ex2 = svgPlot.clientWidth;
                     var ey2 = 0;
                     if (value == "top") {
                         ey1 += this.Tick.LineWidth / 2;
                         ey2 += this.Tick.LineWidth / 2;
                     }
                     else if (value == "bottom") {
-                        ey1 = svgChart.clientHeight - this.Tick.LineWidth / 2;
-                        ey2 = svgChart.clientHeight - this.Tick.LineWidth / 2;
+                        ey1 = svgPlot.clientHeight - this.Tick.LineWidth / 2;
+                        ey2 = svgPlot.clientHeight - this.Tick.LineWidth / 2;
                     }
                     if (value == "top") {
                         FChartHelper.SetSVGLineAttributes(envelopeLine, "yaxis-envelopeline-" + this.ID, ex1.toString(), ey1.toString(), ex2.toString(), ey2.toString(), this.LineWidth.toString(), this.LineColor);
-                        svgChart.appendChild(envelopeLine);
+                        svgPlot.appendChild(envelopeLine);
                     }
                 }
                 var tickLabel = chart.CreateSVGTextElement();
@@ -466,12 +480,15 @@ define(["require", "exports"], function (require, exports) {
                     minYTickLabelFontSize = textInfo.Key;
                 }
                 lx = regionWidth - this.TickWidth - this.MarginBetweenTickAndLabel;
+                if (this.Layout == YAxisLayout.Right) {
+                    lx = this.TickWidth + this.MarginBetweenTickAndLabel;
+                }
                 ly = iy;
                 ly = ly + yTickLabelFontSize / 2 - yTickLabelFontSize * 0.3 / 2;
                 tickLabel.innerHTML = value;
                 tickLabel.setAttribute("x", lx.toString());
                 tickLabel.setAttribute("y", ly.toString());
-                FChartHelper.SetSVGTextAttributes(tickLabel, "yaxis-ticklabel-" + value, lx.toString(), ly.toString(), (value == "top" || value == "bottom") ? "" : value, "end", this.FontFamily, this.FontStyle, yTickLabelFontSize.toString(), this.FontWeight);
+                FChartHelper.SetSVGTextAttributes(tickLabel, "yaxis-ticklabel-" + value, lx.toString(), ly.toString(), (value == "top" || value == "bottom") ? "" : value, this.Layout == YAxisLayout.Left ? "end" : "start", this.FontFamily, this.FontStyle, yTickLabelFontSize.toString(), this.FontWeight);
                 svg.appendChild(tickLabel);
                 arrYTickLabels.push(tickLabel);
             }
@@ -493,6 +510,9 @@ define(["require", "exports"], function (require, exports) {
             var regionHeight = svg.clientHeight;
             var dLabelFontSize = Math.abs(this.Title.FontSize);
             var x = regionWidth - this.TickWidth - this.MaxTickLabelWidth - this.MarginBetweenTickAndLabel * 2;
+            if (this.Layout == YAxisLayout.Right) {
+                x = this.TickWidth + this.MaxTickLabelWidth + this.MarginBetweenTickAndLabel * 2;
+            }
             var y = regionHeight / 2.0 + dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2;
             var text = chart.CreateSVGTextElement();
             var transform = "rotate(270," + x.toString() + "," + y.toString() + ")";
@@ -820,13 +840,14 @@ define(["require", "exports"], function (require, exports) {
             this.ShapeWidth = 0;
             this.LabelWidth = 0;
             this.LabelHeight = 0;
+            this.FontSizeDraw = 0;
             this.FontSizeW = 0;
             this.FontSizeH = 0;
             this.LargeTextW = "";
             this.LargeTextH = "";
             this.LEGEND_ITEM_MAX_WIDTH = 200;
             this.LEGEND_ITEM_MAX_HEIGHT = 50;
-            this.MAX_SHAPE_WIDTH = 20;
+            this.MAX_SHAPE_WIDTH = 100;
             this.HorizontalMeasured = false;
             this.VerticalMeasured = false;
         }
@@ -846,7 +867,7 @@ define(["require", "exports"], function (require, exports) {
             this.ShapeWidth = Math.min(this.Width * 0.3, this.MAX_SHAPE_WIDTH);
             var maxTextWidth = this.Width - this.MAX_SHAPE_WIDTH;
             var biggestTextWidth = 0;
-            this.FontSizeW = this.FontSize;
+            this.FontSizeW = this.FontSize * 1.5;
             for (var i = 0; i < chart.DataSeries.length; i++) {
                 var serie = chart.DataSeries[i];
                 if (!serie.Show) {
@@ -884,7 +905,7 @@ define(["require", "exports"], function (require, exports) {
             // Measure.
             var maxTextHeight = dLegendItemHeight;
             var biggestTextHeight = 0;
-            this.FontSizeH = this.FontSize;
+            this.FontSizeH = this.FontSize * 1.5;
             for (var i = 0; i < chart.DataSeries.length; i++) {
                 var serie = chart.DataSeries[i];
                 if (!serie.Show) {
@@ -912,9 +933,9 @@ define(["require", "exports"], function (require, exports) {
             if (!this.HorizontalMeasured || !this.VerticalMeasured) {
                 return;
             }
-            this.FontSize = this.FontSizeW > this.FontSizeH ? this.FontSizeH : this.FontSizeW;
-            var textSize1 = chart.GetTextSize(this.LargeTextW, this.FontSize.toString(), this.FontFamily, this.FontStyle, this.FontWeight);
-            var textSize2 = chart.GetTextSize(this.LargeTextH, this.FontSize.toString(), this.FontFamily, this.FontStyle, this.FontWeight);
+            var testFontSize = this.FontSizeW > this.FontSizeH ? this.FontSizeH : this.FontSizeW;
+            var textSize1 = chart.GetTextSize(this.LargeTextW, testFontSize.toString(), this.FontFamily, this.FontStyle, this.FontWeight);
+            var textSize2 = chart.GetTextSize(this.LargeTextH, testFontSize.toString(), this.FontFamily, this.FontStyle, this.FontWeight);
             this.LabelWidth = textSize1.Width;
             this.LabelHeight = textSize2.Height;
             this.Width = 0;
@@ -941,7 +962,10 @@ define(["require", "exports"], function (require, exports) {
                     }
                 }
             }
-            this.FontSize /= 1.5; // Leave some margin for box.
+            this.FontSizeDraw = this.FontSize;
+            if (this.FontSize > testFontSize) {
+                this.FontSizeDraw = testFontSize;
+            }
         };
         FChartLegend.prototype.Draw = function (chart) {
             if (!this.Show) {
@@ -970,15 +994,16 @@ define(["require", "exports"], function (require, exports) {
             var sixthOfH = this.LabelHeight / 6;
             var fifthOfW = this.ShapeWidth / 5;
             var yStart = 0;
+            var xStart = 0;
             for (var i = 0; i < chart.DataSeries.length; i++) {
                 var serie = chart.DataSeries[i];
                 if (!serie.Show) {
                     continue;
                 }
                 var line = chart.CreateSVGLineElement();
-                var x1 = fifthOfW;
+                var x1 = xStart + fifthOfW;
                 var y1 = yStart + sixthOfH * 3;
-                var x2 = fifthOfW * 4;
+                var x2 = xStart + fifthOfW * 4;
                 var y2 = yStart + sixthOfH * 3;
                 var lineID = "legend-item-line-" + serie.XAxisID + "-" + serie.YAxisID;
                 var lineThick = sixthOfH * 2;
@@ -986,30 +1011,45 @@ define(["require", "exports"], function (require, exports) {
                 svgLegend.appendChild(line);
                 if (!FChartHelper.ObjectIsNullOrEmpty(serie.Mark)) {
                     var mark = $.extend(true, {}, serie.Mark);
-                    var mx = this.ShapeWidth / 2;
+                    var mx = xStart + this.ShapeWidth / 2;
                     var my = yStart + this.LabelHeight / 2;
                     mark.AttatchTo = MarkAttachTo.Legend;
                     mark.Rotation = 0;
                     mark.X = mx;
                     mark.Y = my;
-                    mark.Width = fifthOfW * 3;
-                    mark.Height = sixthOfH * 4;
-                    if (typeof (mark) == "CircleMark") {
+                    mark.Width = fifthOfW;
+                    mark.Height = sixthOfH * 3;
+                    if (serie.Mark instanceof CircleMark) {
                         mark.Radius = sixthOfH * 2;
                     }
                     mark.Draw(chart);
                 }
                 var lbl = serie.Label;
                 var text = chart.CreateSVGTextElement();
-                var lx = this.ShapeWidth;
-                var ly = yStart + this.LabelHeight / 2 + this.FontSize / 2 - this.FontSize * 0.3 / 2;
+                var lx = xStart + this.ShapeWidth;
+                var ly = yStart + this.LabelHeight / 2 + this.FontSizeDraw / 2 - this.FontSizeDraw * 0.3 / 2;
                 var textID = "legend-item-" + i.toString() + "-" + lbl;
-                FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), lbl, "start", this.FontFamily, this.FontStyle, this.FontSize.toString(), this.FontWeight);
+                FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), lbl, "start", this.FontFamily, this.FontStyle, this.FontSizeDraw.toString(), this.FontWeight);
                 svgLegend.appendChild(text);
-                yStart += this.LabelHeight;
+                if (this.ContentLayout == LegendContentLayout.Vertical) {
+                    yStart += this.LabelHeight;
+                }
+                else if (this.ContentLayout == LegendContentLayout.Horizontal) {
+                    xStart += (this.ShapeWidth + this.LabelWidth);
+                }
             }
         };
         ;
+        FChartLegend.prototype.ResetIndirectVariables = function () {
+            this.FontSizeW = 0;
+            this.FontSizeH = 0;
+            this.LargeTextW = "";
+            this.LargeTextH = "";
+            this.HorizontalMeasured = false;
+            this.VerticalMeasured = false;
+            this.LabelWidth = 0;
+            this.LabelHeight = 0;
+        };
         return FChartLegend;
     }(ChartGraphObject));
     exports.FChartLegend = FChartLegend;
@@ -2198,12 +2238,14 @@ define(["require", "exports"], function (require, exports) {
                 this.PlotHeight = this.ChartHeight - xAxesHeight;
                 this.Legend.PredictWidth(this, this.PlotWidth * 0.3);
                 this.Legend.PredictHeight(this, this.PlotHeight);
+                this.Legend.CalculateSize(this);
             }
             else if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
                 var w = this.ChartWidth - yAxesWidth;
                 var h = this.ChartHeight - xAxesHeight;
                 this.Legend.PredictWidth(this, w);
                 this.Legend.PredictHeight(this, h * 0.3);
+                this.Legend.CalculateSize(this);
                 this.PlotWidth = this.ChartWidth - yAxesWidth;
                 this.PlotHeight = this.ChartHeight - xAxesHeight - this.Legend.Height;
             }
@@ -2212,6 +2254,7 @@ define(["require", "exports"], function (require, exports) {
                 this.PlotHeight = this.ChartHeight - xAxesHeight;
                 this.Legend.PredictWidth(this, this.PlotWidth);
                 this.Legend.PredictHeight(this, this.PlotHeight * 0.3);
+                this.Legend.CalculateSize(this);
             }
             this.m_width = this.PlotWidth;
             this.m_height = this.PlotHeight;
@@ -2388,6 +2431,7 @@ define(["require", "exports"], function (require, exports) {
                     var y = this.m_coeff.ToWcY(this.m_height);
                     yaxis.Value2Wc.push({ Key: "bottom", Value: y });
                 }
+                yaxis.Value2Wc = new Array();
                 var y1 = reserveTopSpace;
                 for (var p = nYTicksCount; p >= 0; p--) {
                     if (p % iMultiple != 0) {
@@ -2396,7 +2440,8 @@ define(["require", "exports"], function (require, exports) {
                     var value = p * smallScale;
                     var yd = y1 + ((nYTicksCount - p) * smallScale) * yPixelsPerValue;
                     var y = this.m_coeff.ToWcY(yd);
-                    yaxis.Value2Wc.push({ Key: value.toString(), Value: y });
+                    var strLabel = value.toFixed(yaxis.Tick.ValueToFixed);
+                    yaxis.Value2Wc.push({ Key: strLabel, Value: y });
                 }
                 if (yaxis.TopEnvelopeLine.Show) {
                     var y = this.m_coeff.ToWcY(0);
@@ -2464,6 +2509,7 @@ define(["require", "exports"], function (require, exports) {
                 var iType = -1;
                 var nTicksCount = 0;
                 var obj2 = null;
+                xaxis.Value2Wc = new Array();
                 if (xaxis.Type == XAxisType.Number || (xaxis.Type == XAxisType.Date && xaxis.TickSelection == XAxisDateTickSelection.DateAsNumber)) {
                     maxAverageDiff = this_1.GetXAxisAverageDiff(xaxis.ID);
                     var obj = this_1.GetXAxisTickCount(xaxis.ID, maxAverageDiff, maxX, minX, this_1.m_width);
@@ -2488,10 +2534,9 @@ define(["require", "exports"], function (require, exports) {
                         var dValue = p * xaxis.Scale;
                         var xd = dValue * xaxis.PixelsPerValue;
                         var x = this_1.m_coeff.ToWcX(xd);
-                        xaxis.Value2Wc.push({ Key: dValue.toString(), Value: x });
-                        length_2++;
+                        var strLabel = dValue.toFixed(xaxis.Tick.ValueToFixed);
+                        xaxis.Value2Wc.push({ Key: strLabel, Value: x });
                     }
-                    xaxis.Value2Wc.length = length_2;
                 }
                 else if (iType == 1) {
                     for (var p = 0; p < obj2.Ticks.length; p++) {
@@ -2499,9 +2544,7 @@ define(["require", "exports"], function (require, exports) {
                         var xd = dValue * xPixelsPerValue;
                         var x = this_1.m_coeff.ToWcX(xd);
                         xaxis.Value2Wc.push({ Key: dValue.toString(), Value: x });
-                        length_2++;
                     }
-                    xaxis.Value2Wc.length = length_2;
                 }
             };
             var this_1 = this;
@@ -2575,7 +2618,7 @@ define(["require", "exports"], function (require, exports) {
                     if (!xaxis.Show) {
                         continue;
                     }
-                    var svgX = this.CreateSVG("svg-xaxis" + xaxis.ID, "absolute", xaxis.X.toString(), xaxis.Y.toString(), this.PlotWidth.toString(), xaxis.Height.toString());
+                    var svgX = this.CreateSVG("svg-xaxis-" + xaxis.ID, "absolute", xaxis.X.toString(), xaxis.Y.toString(), this.PlotWidth.toString(), xaxis.Height.toString());
                     divContainer.appendChild(svgX);
                     this.m_arrSVG.push(svgX);
                 }
