@@ -665,7 +665,7 @@
             }
 
             let circle: SVGCircleElement = chart.CreateSVGCircleElement();
-            FChartHelper.SetCircleAttributes(circle, this.Key, this.X.toString(), this.Y.toString(), this.Radius.toString(), this.BackgroundColor, this.LineWidth.toString(), this.LineColor);
+            FChartHelper.SetSVGCircleAttributes(circle, this.Key, this.X.toString(), this.Y.toString(), this.Radius.toString(), this.BackgroundColor, this.LineWidth.toString(), this.LineColor);
 
             if (this.AttatchTo == MarkAttachTo.Plot) {
                 let svgPlot: SVGSVGElement = chart.GetPlotSVG();
@@ -1140,7 +1140,7 @@
         Bottom
     }
 
-    class FChartZoomControl extends ChartGraphObject {
+    export class FChartZoomControl extends ChartGraphObject {
         public Layout: ZoomControlLayout = ZoomControlLayout.Right;
         public get Orientation(): Orientation {
             if (this.Layout == ZoomControlLayout.Left || this.Layout == ZoomControlLayout.Right) {
@@ -1149,30 +1149,40 @@
 
             return Orientation.Horizontal;
         }
-
         public HorizontalAlignment: HorizontalAlignment = HorizontalAlignment.Left;
         public VerticalAlignment: VerticalAlignment = VerticalAlignment.Top;
-
         public DefaultShortSize: number = 50;
         public DefaultLongSize: number = 300;
         public ShortSize: number = 0;
         public LongSize: number = 0;
 
-        private get HorizontalMargin(): number {
-            if (this.Orientation == Orientation.Horizontal) {
-                return (this.LongSize * 0.1);
-            }
-            else {
-                return (this.ShortSize * 0.1);
-            }
+        constructor() {
+            super();
+            this.LineWidth = 2;
         }
-        private get VerticalMargin(): number {
-            if (this.Orientation == Orientation.Vertical) {
-                return (this.LongSize * 0.1);
+
+        private get Margin(): number {
+            let m: number = 0;
+            let mh: number = 0;
+            let mv: number = 0;
+
+            if (this.Orientation == Orientation.Horizontal) {
+                mh = this.LongSize * 0.1;
             }
             else {
-                return (this.ShortSize * 0.1);
+                mh = this.ShortSize * 0.1;
             }
+
+            if (this.Orientation == Orientation.Vertical) {
+                mv = this.LongSize * 0.1;
+            }
+            else {
+                mv = this.ShortSize * 0.1;
+            }
+
+            m = Math.min(mh, mv);
+
+            return m;
         }
 
         public AttachedChart: FChart = null;
@@ -1201,6 +1211,182 @@
         }
 
         public Draw(chart: FChart): void {
+            let svgZoomControl: SVGSVGElement = chart.GetSVGSVGElementByID("svg-zoomcontrol");
+            if (FChartHelper.ObjectIsNullOrEmpty(svgZoomControl)) {
+                return;
+            }
+
+            if (this.Layout == ZoomControlLayout.Left || this.Layout == ZoomControlLayout.Right) {
+                let w: number = this.ShortSize;
+                let h: number = this.LongSize;
+                w -= this.Margin;
+                h -= this.Margin;
+
+                let mx: number = this.Margin / 2;
+                let my: number = this.Margin / 2;
+                let twothOfW: number = w / 2;
+                let eighthOfH: number = h / 8;
+
+                let r: number = Math.min(eighthOfH / 2, twothOfW / 2);
+                let hb: number = h - 4 * r;
+                let cx1: number = mx + r;
+                let cy1: number = my + 2 * r - r;
+                let circle1: SVGCircleElement = chart.CreateSVGCircleElement();
+                FChartHelper.SetSVGCircleAttributes(circle1, "zoomcontrol-zoomin-holder", cx1.toString(), cy1.toString(), r.toString(), "none", this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(circle1);
+                let ix1: number = cx1;
+                let iy1: number = my;
+                let ix2: number = cx1;
+                let iy2: number = my + 2 * r;
+                let lineP1: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP1, "zoomcontrol-zoomin-holder-l1", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP1);
+                ix1 = mx;
+                ix2 = mx + 2 * r;
+                iy1 = my + r;
+                iy2 = iy1;
+                let lineP2: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP2, "zoomcontrol-zoomin-holder-l2", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP2);
+
+                let cx2: number = mx + r;
+                let cy2: number = my + 2 * r + hb + r;
+                let circle2: SVGCircleElement = chart.CreateSVGCircleElement();
+                FChartHelper.SetSVGCircleAttributes(circle2, "zoomcontrol-zoomout-holder", cx2.toString(), cy2.toString(), r.toString(), "none", this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(circle2);
+                iy1 = my + 2 * r + hb + r;
+                iy2 = iy1;
+                let lineP3: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP3, "zoomcontrol-zoomout-holder-l1", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP3);
+
+                let lx1: number = cx1;
+                let ly1: number = my + 2 * r;
+                let lx2: number = cx1;
+                let ly2: number = my + 2 * r + hb;
+                let lineBody: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineBody, "zoomcontrol-body-holder", lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineBody);
+
+                let scale: number = hb / chart.MaxZoomLevel;
+                let bx: number = cx1;
+                let by: number = my + 2 * r + (hb - chart.ZoomLevel * scale);
+                let bx1: number = bx - r;
+                let by1: number = by - scale;
+                let bx2: number = bx + r;
+                let by2: number = by - scale;
+                let bx3: number = bx + r;
+                let by3: number = by + scale;
+                let bx4: number = bx - r;
+                let by4: number = by + scale;
+                let bar: SVGPathElement = chart.CreateSVGPathElement();
+                let d: string = "M" + bx1.toString() + " " + by1.toString() + " " +
+                    "L" + bx2.toString() + " " + by2.toString() + " " +
+                    "L" + bx3.toString() + " " + by3.toString() + " " +
+                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
+                
+                bar.setAttribute("d", d);
+                bar.setAttribute("stroke-width", this.LineWidth.toString());
+                bar.setAttribute("stroke", this.LineColor);
+                bar.setAttribute("fill", this.LineColor);
+                svgZoomControl.appendChild(bar);
+
+                let tx: number = mx + r * 2 + twothOfW / 2;
+                let ty: number = my + 2 * r + hb / 2;
+                let dLabelFontSize: number = this.FontSize;
+                ty += (dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2);
+                let strLabel: string = chart.ZoomLevel.toFixed(2);
+                let text: SVGTextElement = chart.CreateSVGTextElement();
+                let transform: string = "rotate(270," + tx.toString() + "," + ty.toString() + ")";
+                FChartHelper.SetSVGTextAttributes(text, "zoomcontrol-label", tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor, transform);
+                svgZoomControl.appendChild(text);
+            }
+            else {
+                let w: number = this.LongSize;
+                let h: number = this.ShortSize;
+                w -= this.Margin;
+                h -= this.Margin;
+
+                let mx: number = this.Margin / 2;
+                let my: number = this.Margin / 2;
+                let twothOfH: number = h / 2;
+                let eighthOfW: number = w / 8;
+
+                let r: number = Math.min(eighthOfW / 2, twothOfH / 2);
+                let wb: number = w - 4 * r;
+                let cx1: number = mx + r;
+                let cy1: number = my + twothOfH + r;
+                let circle1: SVGCircleElement = chart.CreateSVGCircleElement();
+                FChartHelper.SetSVGCircleAttributes(circle1, "zoomcontrol-zoomin-holder", cx1.toString(), cy1.toString(), r.toString(), "none", this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(circle1);
+                let ix1: number = mx;
+                let iy1: number = my + twothOfH + r;
+                let ix2: number = mx + 2 * r;
+                let iy2: number = iy1;
+                let lineP1: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP1, "zoomcontrol-zoomin-holder-l1", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP1);
+                ix1 = mx + r;
+                ix2 = ix1;
+                iy1 = my + twothOfH;
+                iy2 = iy1 + 2 * r;
+                let lineP2: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP2, "zoomcontrol-zoomin-holder-l2", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP2);
+
+                let cx2: number = mx + 2 * r + wb + r;
+                let cy2: number = my + twothOfH + r;
+                let circle2: SVGCircleElement = chart.CreateSVGCircleElement();
+                FChartHelper.SetSVGCircleAttributes(circle2, "zoomcontrol-zoomout-holder", cx2.toString(), cy2.toString(), r.toString(), "none", this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(circle2);
+                ix1 = mx + 2 * r + wb + r;
+                ix2 = ix1;
+                iy1 = my + twothOfH;
+                iy2 = iy1 + 2 * r;
+                let lineP3: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP3, "zoomcontrol-zoomout-holder-l1", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP3);
+
+                let lx1: number = mx + 2 * r;
+                let ly1: number = my + twothOfH + r;
+                let lx2: number = lx1 + wb;
+                let ly2: number = ly1;
+                let lineBody: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineBody, "zoomcontrol-body-holder", lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineBody);
+
+                let scale: number = wb / chart.MaxZoomLevel;
+                let bx: number = mx + 2 * r + chart.ZoomLevel * scale;
+                let by: number = my + twothOfH + r;
+                let bx1: number = bx - scale;
+                let by1: number = by - r;
+                let bx2: number = bx + scale;
+                let by2: number = by - r;
+                let bx3: number = bx + scale;
+                let by3: number = by + r;
+                let bx4: number = bx - scale;
+                let by4: number = by + r;
+                let bar: SVGPathElement = chart.CreateSVGPathElement();
+                let d: string = "M" + bx1.toString() + " " + by1.toString() + " " +
+                    "L" + bx2.toString() + " " + by2.toString() + " " +
+                    "L" + bx3.toString() + " " + by3.toString() + " " +
+                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
+
+                bar.setAttribute("d", d);
+                bar.setAttribute("stroke-width", this.LineWidth.toString());
+                bar.setAttribute("stroke", this.LineColor);
+                bar.setAttribute("fill", this.LineColor);
+                svgZoomControl.appendChild(bar);
+
+                let tx: number = mx + 2 * r + wb / 2;
+                let ty: number = my + twothOfH / 2;
+                let dLabelFontSize: number = this.FontSize;
+                ty += (dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2);
+                let strLabel: string = chart.ZoomLevel.toFixed(2);
+                let text: SVGTextElement = chart.CreateSVGTextElement();
+                FChartHelper.SetSVGTextAttributes(text, "zoomcontrol-label", tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor);
+                svgZoomControl.appendChild(text);
+            }
         }
     }
 
@@ -1403,7 +1589,7 @@
             line.setAttribute("stroke", stroke);
         }
 
-        public static SetCircleAttributes(circle: SVGCircleElement, id: string, cx: string, cy: string, r: string, fill: string, strokeWidth: string, stroke: string): void {
+        public static SetSVGCircleAttributes(circle: SVGCircleElement, id: string, cx: string, cy: string, r: string, fill: string, strokeWidth: string, stroke: string): void {
             if (this.StringIsNaN(cx) || this.StringIsNaN(cy) || this.StringIsNaN(r)) {
                 return;
                 //debugger;
@@ -1554,6 +1740,8 @@
         public ZoomMode: ChartZoomMode = ChartZoomMode.Center;
         public Zoomable: boolean = false;
         public ZoomControl: FChartZoomControl = new FChartZoomControl();
+        public MaxZoomLevel: number = 5;
+        public ZoomLevel: number = 1;
 
         public XAxisLeftMargin: number = 10;
         public XAxisRightMargin: number = 50;
@@ -1843,6 +2031,8 @@
                 return;
             }
 
+            this.MaxZoomLevel = Math.ceil(Math.abs(this.MaxZoomLevel));
+
             this.PrepareContainer();
             this.SetCoordinate();
             this.Draw();
@@ -1890,6 +2080,7 @@
             this.DrawGridLine();
             this.DrawDataSeries();
             this.DrawLegend();
+            this.DrawZoomControl();
         }
 
         private DrawXAxes(): void {
@@ -2063,6 +2254,12 @@
         private DrawLegend(): void {
             if (this.Legend.Show) {
                 this.Legend.Draw(this);
+            }
+        }
+
+        private DrawZoomControl(): void {
+            if (this.Zoomable) {
+                this.ZoomControl.Draw(this);
             }
         }
 
@@ -2510,6 +2707,7 @@
                 let predictHeight: number = this.XAxisDefaultHeight * nCount;
                 let maxHeight: number = 0;
                 if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
+                    maxHeight = h * 0.3;
                     if (this.Zoomable) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                             let hz: number = h * 0.1;
@@ -2517,20 +2715,15 @@
                             maxHeight = h * 0.25 + (hz - this.ZoomControl.ShortSize);
                         }
                     }
-                    else {
-                        maxHeight = h * 0.3;
-                    }
                 }
                 else {
+                    maxHeight = h * 0.5;
                     if (this.Zoomable) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                             let hz: number = h * 0.1;
                             this.ZoomControl.CalculateShortSize(hz);
                             maxHeight = h * 0.4 + (hz - this.ZoomControl.ShortSize);
                         }
-                    }
-                    else {
-                        maxHeight = h * 0.5;
                     }
                 }
 
@@ -2575,6 +2768,7 @@
                 let predictWidth: number = this.YAxisDefaultWidth * nCount;
                 let maxWidth: number = 0;
                 if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
+                    maxWidth = w * 0.3;
                     if (this.Zoomable) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                             let wz: number = w * 0.1;
@@ -2582,20 +2776,15 @@
                             maxWidth = w * 0.25 + (wz - this.ZoomControl.ShortSize);
                         }
                     }
-                    else {
-                        maxWidth = w * 0.3;
-                    }
                 }
                 else {
+                    maxWidth = w * 0.5;
                     if (this.Zoomable) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                             let wz: number = w * 0.1;
                             this.ZoomControl.CalculateShortSize(wz);
                             maxWidth = w * 0.4 + (wz - this.ZoomControl.ShortSize);
                         }
-                    }
-                    else {
-                        maxWidth = w * 0.5;
                     }
                 }
 
@@ -3218,7 +3407,7 @@
                 divContainer.appendChild(svgZoomControl);
                 this.m_arrSVG.push(svgZoomControl);
 
-                svgZoomControl.style.setProperty("background-color", "magenta");
+                svgZoomControl.style.setProperty("background-color", "lightgray");
             }
         }
 

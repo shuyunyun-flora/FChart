@@ -628,7 +628,7 @@ define(["require", "exports"], function (require, exports) {
                 return;
             }
             var circle = chart.CreateSVGCircleElement();
-            FChartHelper.SetCircleAttributes(circle, this.Key, this.X.toString(), this.Y.toString(), this.Radius.toString(), this.BackgroundColor, this.LineWidth.toString(), this.LineColor);
+            FChartHelper.SetSVGCircleAttributes(circle, this.Key, this.X.toString(), this.Y.toString(), this.Radius.toString(), this.BackgroundColor, this.LineWidth.toString(), this.LineColor);
             if (this.AttatchTo == MarkAttachTo.Plot) {
                 var svgPlot = chart.GetPlotSVG();
                 if (FChartHelper.ObjectIsNullOrEmpty(svgPlot)) {
@@ -1082,7 +1082,7 @@ define(["require", "exports"], function (require, exports) {
     var FChartZoomControl = (function (_super) {
         __extends(FChartZoomControl, _super);
         function FChartZoomControl() {
-            _super.apply(this, arguments);
+            _super.call(this);
             this.Layout = ZoomControlLayout.Right;
             this.HorizontalAlignment = HorizontalAlignment.Left;
             this.VerticalAlignment = VerticalAlignment.Top;
@@ -1096,6 +1096,7 @@ define(["require", "exports"], function (require, exports) {
             this.ZoomDragger = null;
             this.ValueLabel = null;
             this.Body = null;
+            this.LineWidth = 2;
         }
         Object.defineProperty(FChartZoomControl.prototype, "Orientation", {
             get: function () {
@@ -1107,26 +1108,25 @@ define(["require", "exports"], function (require, exports) {
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(FChartZoomControl.prototype, "HorizontalMargin", {
+        Object.defineProperty(FChartZoomControl.prototype, "Margin", {
             get: function () {
+                var m = 0;
+                var mh = 0;
+                var mv = 0;
                 if (this.Orientation == Orientation.Horizontal) {
-                    return (this.LongSize * 0.1);
+                    mh = this.LongSize * 0.1;
                 }
                 else {
-                    return (this.ShortSize * 0.1);
+                    mh = this.ShortSize * 0.1;
                 }
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(FChartZoomControl.prototype, "VerticalMargin", {
-            get: function () {
                 if (this.Orientation == Orientation.Vertical) {
-                    return (this.LongSize * 0.1);
+                    mv = this.LongSize * 0.1;
                 }
                 else {
-                    return (this.ShortSize * 0.1);
+                    mv = this.ShortSize * 0.1;
                 }
+                m = Math.min(mh, mv);
+                return m;
             },
             enumerable: true,
             configurable: true
@@ -1148,9 +1148,171 @@ define(["require", "exports"], function (require, exports) {
             }
         };
         FChartZoomControl.prototype.Draw = function (chart) {
+            var svgZoomControl = chart.GetSVGSVGElementByID("svg-zoomcontrol");
+            if (FChartHelper.ObjectIsNullOrEmpty(svgZoomControl)) {
+                return;
+            }
+            if (this.Layout == ZoomControlLayout.Left || this.Layout == ZoomControlLayout.Right) {
+                var w = this.ShortSize;
+                var h = this.LongSize;
+                w -= this.Margin;
+                h -= this.Margin;
+                var mx = this.Margin / 2;
+                var my = this.Margin / 2;
+                var twothOfW = w / 2;
+                var eighthOfH = h / 8;
+                var r = Math.min(eighthOfH / 2, twothOfW / 2);
+                var hb = h - 4 * r;
+                var cx1 = mx + r;
+                var cy1 = my + 2 * r - r;
+                var circle1 = chart.CreateSVGCircleElement();
+                FChartHelper.SetSVGCircleAttributes(circle1, "zoomcontrol-zoomin-holder", cx1.toString(), cy1.toString(), r.toString(), "none", this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(circle1);
+                var ix1 = cx1;
+                var iy1 = my;
+                var ix2 = cx1;
+                var iy2 = my + 2 * r;
+                var lineP1 = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP1, "zoomcontrol-zoomin-holder-l1", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP1);
+                ix1 = mx;
+                ix2 = mx + 2 * r;
+                iy1 = my + r;
+                iy2 = iy1;
+                var lineP2 = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP2, "zoomcontrol-zoomin-holder-l2", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP2);
+                var cx2 = mx + r;
+                var cy2 = my + 2 * r + hb + r;
+                var circle2 = chart.CreateSVGCircleElement();
+                FChartHelper.SetSVGCircleAttributes(circle2, "zoomcontrol-zoomout-holder", cx2.toString(), cy2.toString(), r.toString(), "none", this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(circle2);
+                iy1 = my + 2 * r + hb + r;
+                iy2 = iy1;
+                var lineP3 = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP3, "zoomcontrol-zoomout-holder-l1", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP3);
+                var lx1 = cx1;
+                var ly1 = my + 2 * r;
+                var lx2 = cx1;
+                var ly2 = my + 2 * r + hb;
+                var lineBody = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineBody, "zoomcontrol-body-holder", lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineBody);
+                var scale = hb / chart.MaxZoomLevel;
+                var bx = cx1;
+                var by = my + 2 * r + (hb - chart.ZoomLevel * scale);
+                var bx1 = bx - r;
+                var by1 = by - scale;
+                var bx2 = bx + r;
+                var by2 = by - scale;
+                var bx3 = bx + r;
+                var by3 = by + scale;
+                var bx4 = bx - r;
+                var by4 = by + scale;
+                var bar = chart.CreateSVGPathElement();
+                var d = "M" + bx1.toString() + " " + by1.toString() + " " +
+                    "L" + bx2.toString() + " " + by2.toString() + " " +
+                    "L" + bx3.toString() + " " + by3.toString() + " " +
+                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
+                bar.setAttribute("d", d);
+                bar.setAttribute("stroke-width", this.LineWidth.toString());
+                bar.setAttribute("stroke", this.LineColor);
+                bar.setAttribute("fill", this.LineColor);
+                svgZoomControl.appendChild(bar);
+                var tx = mx + r * 2 + twothOfW / 2;
+                var ty = my + 2 * r + hb / 2;
+                var dLabelFontSize = this.FontSize;
+                ty += (dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2);
+                var strLabel = chart.ZoomLevel.toFixed(2);
+                var text = chart.CreateSVGTextElement();
+                var transform = "rotate(270," + tx.toString() + "," + ty.toString() + ")";
+                FChartHelper.SetSVGTextAttributes(text, "zoomcontrol-label", tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor, transform);
+                svgZoomControl.appendChild(text);
+            }
+            else {
+                var w = this.LongSize;
+                var h = this.ShortSize;
+                w -= this.Margin;
+                h -= this.Margin;
+                var mx = this.Margin / 2;
+                var my = this.Margin / 2;
+                var twothOfH = h / 2;
+                var eighthOfW = w / 8;
+                var r = Math.min(eighthOfW / 2, twothOfH / 2);
+                var wb = w - 4 * r;
+                var cx1 = mx + r;
+                var cy1 = my + twothOfH + r;
+                var circle1 = chart.CreateSVGCircleElement();
+                FChartHelper.SetSVGCircleAttributes(circle1, "zoomcontrol-zoomin-holder", cx1.toString(), cy1.toString(), r.toString(), "none", this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(circle1);
+                var ix1 = mx;
+                var iy1 = my + twothOfH + r;
+                var ix2 = mx + 2 * r;
+                var iy2 = iy1;
+                var lineP1 = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP1, "zoomcontrol-zoomin-holder-l1", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP1);
+                ix1 = mx + r;
+                ix2 = ix1;
+                iy1 = my + twothOfH;
+                iy2 = iy1 + 2 * r;
+                var lineP2 = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP2, "zoomcontrol-zoomin-holder-l2", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP2);
+                var cx2 = mx + 2 * r + wb + r;
+                var cy2 = my + twothOfH + r;
+                var circle2 = chart.CreateSVGCircleElement();
+                FChartHelper.SetSVGCircleAttributes(circle2, "zoomcontrol-zoomout-holder", cx2.toString(), cy2.toString(), r.toString(), "none", this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(circle2);
+                ix1 = mx + 2 * r + wb + r;
+                ix2 = ix1;
+                iy1 = my + twothOfH;
+                iy2 = iy1 + 2 * r;
+                var lineP3 = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP3, "zoomcontrol-zoomout-holder-l1", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP3);
+                var lx1 = mx + 2 * r;
+                var ly1 = my + twothOfH + r;
+                var lx2 = lx1 + wb;
+                var ly2 = ly1;
+                var lineBody = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineBody, "zoomcontrol-body-holder", lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineBody);
+                var scale = wb / chart.MaxZoomLevel;
+                var bx = mx + 2 * r + chart.ZoomLevel * scale;
+                var by = my + twothOfH + r;
+                var bx1 = bx - scale;
+                var by1 = by - r;
+                var bx2 = bx + scale;
+                var by2 = by - r;
+                var bx3 = bx + scale;
+                var by3 = by + r;
+                var bx4 = bx - scale;
+                var by4 = by + r;
+                var bar = chart.CreateSVGPathElement();
+                var d = "M" + bx1.toString() + " " + by1.toString() + " " +
+                    "L" + bx2.toString() + " " + by2.toString() + " " +
+                    "L" + bx3.toString() + " " + by3.toString() + " " +
+                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
+                bar.setAttribute("d", d);
+                bar.setAttribute("stroke-width", this.LineWidth.toString());
+                bar.setAttribute("stroke", this.LineColor);
+                bar.setAttribute("fill", this.LineColor);
+                svgZoomControl.appendChild(bar);
+                var tx = mx + 2 * r + wb / 2;
+                var ty = my + twothOfH / 2;
+                var dLabelFontSize = this.FontSize;
+                ty += (dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2);
+                var strLabel = chart.ZoomLevel.toFixed(2);
+                var text = chart.CreateSVGTextElement();
+                FChartHelper.SetSVGTextAttributes(text, "zoomcontrol-label", tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor);
+                svgZoomControl.appendChild(text);
+            }
         };
         return FChartZoomControl;
     }(ChartGraphObject));
+    exports.FChartZoomControl = FChartZoomControl;
     var FloatPoint = (function () {
         function FloatPoint(fx, fy) {
             this.X = 0.0;
@@ -1309,7 +1471,7 @@ define(["require", "exports"], function (require, exports) {
             line.setAttribute("stroke-width", strokeWidth);
             line.setAttribute("stroke", stroke);
         };
-        FChartHelper.SetCircleAttributes = function (circle, id, cx, cy, r, fill, strokeWidth, stroke) {
+        FChartHelper.SetSVGCircleAttributes = function (circle, id, cx, cy, r, fill, strokeWidth, stroke) {
             if (this.StringIsNaN(cx) || this.StringIsNaN(cy) || this.StringIsNaN(r)) {
                 return;
             }
@@ -1434,6 +1596,8 @@ define(["require", "exports"], function (require, exports) {
             this.ZoomMode = ChartZoomMode.Center;
             this.Zoomable = false;
             this.ZoomControl = new FChartZoomControl();
+            this.MaxZoomLevel = 5;
+            this.ZoomLevel = 1;
             this.XAxisLeftMargin = 10;
             this.XAxisRightMargin = 50;
             this.XAxes = new Array();
@@ -1684,6 +1848,7 @@ define(["require", "exports"], function (require, exports) {
             if (FChartHelper.ObjectIsNullOrEmpty(divContainer)) {
                 return;
             }
+            this.MaxZoomLevel = Math.ceil(Math.abs(this.MaxZoomLevel));
             this.PrepareContainer();
             this.SetCoordinate();
             this.Draw();
@@ -1723,6 +1888,7 @@ define(["require", "exports"], function (require, exports) {
             this.DrawGridLine();
             this.DrawDataSeries();
             this.DrawLegend();
+            this.DrawZoomControl();
         };
         FChart.prototype.DrawXAxes = function () {
             for (var i = 0; i < this.XAxes.length; i++) {
@@ -1874,6 +2040,11 @@ define(["require", "exports"], function (require, exports) {
         FChart.prototype.DrawLegend = function () {
             if (this.Legend.Show) {
                 this.Legend.Draw(this);
+            }
+        };
+        FChart.prototype.DrawZoomControl = function () {
+            if (this.Zoomable) {
+                this.ZoomControl.Draw(this);
             }
         };
         FChart.prototype.ShowTooltip = function () {
@@ -2242,6 +2413,7 @@ define(["require", "exports"], function (require, exports) {
                 var predictHeight = this.XAxisDefaultHeight * nCount;
                 var maxHeight = 0;
                 if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
+                    maxHeight = h * 0.3;
                     if (this.Zoomable) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                             var hz = h * 0.1;
@@ -2249,20 +2421,15 @@ define(["require", "exports"], function (require, exports) {
                             maxHeight = h * 0.25 + (hz - this.ZoomControl.ShortSize);
                         }
                     }
-                    else {
-                        maxHeight = h * 0.3;
-                    }
                 }
                 else {
+                    maxHeight = h * 0.5;
                     if (this.Zoomable) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                             var hz = h * 0.1;
                             this.ZoomControl.CalculateShortSize(hz);
                             maxHeight = h * 0.4 + (hz - this.ZoomControl.ShortSize);
                         }
-                    }
-                    else {
-                        maxHeight = h * 0.5;
                     }
                 }
                 if (predictHeight > maxHeight) {
@@ -2302,6 +2469,7 @@ define(["require", "exports"], function (require, exports) {
                 var predictWidth = this.YAxisDefaultWidth * nCount;
                 var maxWidth = 0;
                 if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
+                    maxWidth = w * 0.3;
                     if (this.Zoomable) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                             var wz = w * 0.1;
@@ -2309,20 +2477,15 @@ define(["require", "exports"], function (require, exports) {
                             maxWidth = w * 0.25 + (wz - this.ZoomControl.ShortSize);
                         }
                     }
-                    else {
-                        maxWidth = w * 0.3;
-                    }
                 }
                 else {
+                    maxWidth = w * 0.5;
                     if (this.Zoomable) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                             var wz = w * 0.1;
                             this.ZoomControl.CalculateShortSize(wz);
                             maxWidth = w * 0.4 + (wz - this.ZoomControl.ShortSize);
                         }
-                    }
-                    else {
-                        maxWidth = w * 0.5;
                     }
                 }
                 if (predictWidth > maxWidth) {
@@ -2876,7 +3039,7 @@ define(["require", "exports"], function (require, exports) {
                 var svgZoomControl = this.CreateSVG("svg-zoomcontrol", "absolute", this.ZoomControl.X.toString(), this.ZoomControl.Y.toString(), wz.toString(), hz.toString());
                 divContainer.appendChild(svgZoomControl);
                 this.m_arrSVG.push(svgZoomControl);
-                svgZoomControl.style.setProperty("background-color", "magenta");
+                svgZoomControl.style.setProperty("background-color", "lightgray");
             }
         };
         FChart.prototype.SetWindow = function () {
