@@ -261,7 +261,7 @@ define(["require", "exports"], function (require, exports) {
             this.Rotation = 0;
             this.Width = 0;
             this.Height = 0;
-            this.ValueToFixed = 2;
+            this.MaxFloatDigits = 2;
         }
         FChartTick.prototype.Draw = function (chart) { };
         ;
@@ -1459,6 +1459,71 @@ define(["require", "exports"], function (require, exports) {
             }
             return false;
         };
+        FChartHelper.RoundFloatNumber = function (dValue, maxFloatDigits) {
+            var dResult = 0;
+            if (dValue == 0) {
+                return dValue;
+            }
+            var strValue = dValue.toString();
+            var strInteger = "";
+            var strFloat = "";
+            var bFloatPart = false;
+            for (var i = 0; i < strValue.length; i++) {
+                var c = strValue.charAt(i);
+                if (c == ".") {
+                    bFloatPart = true;
+                    continue;
+                }
+                if (bFloatPart) {
+                    strFloat += c;
+                }
+                else {
+                    strInteger += c;
+                }
+            }
+            var intValue = parseInt(strInteger);
+            var floatValue = parseFloat("0." + strFloat);
+            if (floatValue == 0) {
+                dResult = parseInt(strInteger);
+                return dResult;
+            }
+            if (intValue != 0) {
+                if (floatValue <= 0.5) {
+                    floatValue = 0.5;
+                }
+                else {
+                    floatValue = 0.75;
+                }
+                dResult = intValue + floatValue;
+            }
+            else {
+                var n = 0;
+                for (var i = strFloat.length - 1; i >= 0; i--) {
+                    var c = strFloat.charAt(i);
+                    if (c != "0") {
+                        n = i;
+                        break;
+                    }
+                }
+                if (n == 0) {
+                    floatValue = 0;
+                }
+                else if (n < maxFloatDigits) {
+                    dResult = parseInt(strInteger) + parseFloat("0." + strFloat);
+                }
+                else {
+                    strFloat = strFloat.substr(n);
+                    var v1 = 1;
+                    for (var i = 0; i < maxFloatDigits; i++) {
+                        v1 *= 10;
+                    }
+                    var floatTemp = parseFloat("0." + strFloat);
+                    floatValue = Math.round(floatTemp * v1) / v1;
+                }
+                dResult = floatValue;
+            }
+            return dResult;
+        };
         FChartHelper.SetSVGLineAttributes = function (line, id, x1, y1, x2, y2, strokeWidth, stroke) {
             if (this.StringIsNaN(x1) || this.StringIsNaN(y1) || this.StringIsNaN(x2) || this.StringIsNaN(y2)) {
                 return;
@@ -2174,12 +2239,14 @@ define(["require", "exports"], function (require, exports) {
                     arrAverageDiff.push(dAverage);
                 }
             }
-            var dDiff = -999999999;
+            var dDiff = Number.MIN_VALUE;
             for (var i = 0; i < arrAverageDiff.length; i++) {
                 if (arrAverageDiff[i] > dDiff) {
                     dDiff = arrAverageDiff[i];
                 }
             }
+            var yAxis = this.SearchYAxisByID(YAxisID);
+            dDiff = FChartHelper.RoundFloatNumber(dDiff, yAxis.Tick.MaxFloatDigits);
             return dDiff;
         };
         FChart.prototype.GetTickCount = function (averageDiff, max, min) {
@@ -2265,12 +2332,14 @@ define(["require", "exports"], function (require, exports) {
                     arrAverageDiff.push(dAverage);
                 }
             }
-            var dDiff = -999999999;
+            var dDiff = Number.MIN_VALUE;
             for (var i = 0; i < arrAverageDiff.length; i++) {
                 if (arrAverageDiff[i] > dDiff) {
                     dDiff = arrAverageDiff[i];
                 }
             }
+            var xAxis = this.SearchXAxisByID(XAxisID);
+            dDiff = FChartHelper.RoundFloatNumber(dDiff, xAxis.Tick.MaxFloatDigits);
             return dDiff;
         };
         FChart.prototype.GetXAxisTickCount = function (XAxisID, averageDiff, max, min, len) {
@@ -2758,8 +2827,8 @@ define(["require", "exports"], function (require, exports) {
         };
         FChart.prototype.CalculateYAxisTickCoordinate = function () {
             for (var i = 0; i < this.YAxes.length; i++) {
-                var minY = 99999999;
-                var maxY = -99999999;
+                var minY = Number.MAX_VALUE;
+                var maxY = Number.MIN_VALUE;
                 var yaxis = this.YAxes[i];
                 if (!yaxis.Show) {
                     continue;
@@ -2837,7 +2906,7 @@ define(["require", "exports"], function (require, exports) {
                     var value = p * smallScale;
                     var yd = y1 + ((nYTicksCount - p) * smallScale) * yPixelsPerValue;
                     var y = this.m_coeff.ToWcY(yd);
-                    var strLabel = value.toFixed(yaxis.Tick.ValueToFixed);
+                    var strLabel = value.toString();
                     yaxis.Value2Wc.push({ Key: strLabel, Value: y });
                 }
                 if (yaxis.TopEnvelopeLine.Show) {
@@ -2860,8 +2929,8 @@ define(["require", "exports"], function (require, exports) {
                     maxX = new Date("1975-01-01 00:00:00").valueOf();
                 }
                 else if (xaxis.Type == XAxisType.Number) {
-                    minX = 99999999;
-                    maxX = -99999999;
+                    minX = Number.MAX_VALUE;
+                    maxX = Number.MIN_VALUE;
                 }
                 for (var j = 0; j < this_1.DataSeries.length; j++) {
                     var serie = this_1.DataSeries[j];
@@ -2931,7 +3000,7 @@ define(["require", "exports"], function (require, exports) {
                         var dValue = p * xaxis.Scale;
                         var xd = dValue * xaxis.PixelsPerValue;
                         var x = this_1.m_coeff.ToWcX(xd);
-                        var strLabel = dValue.toFixed(xaxis.Tick.ValueToFixed);
+                        var strLabel = dValue.toString();
                         xaxis.Value2Wc.push({ Key: strLabel, Value: x });
                     }
                 }

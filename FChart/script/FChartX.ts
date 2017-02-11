@@ -270,7 +270,7 @@
         public Rotation: number = 0;
         public Width: number = 0;
         public Height: number = 0;
-        public ValueToFixed: number = 2;
+        public MaxFloatDigits: number = 2;
 
         public Draw(chart: FChart): void { };
     }
@@ -1574,6 +1574,80 @@
             return false;
         }
 
+        public static RoundFloatNumber(dValue: number, maxFloatDigits: number): number {
+            let dResult: number = 0;
+
+            if (dValue == 0) {
+                return dValue;
+            }
+            let strValue: string = dValue.toString();
+            let strInteger: string = "";
+            let strFloat: string = "";
+            let bFloatPart: boolean = false;
+
+            for (let i = 0; i < strValue.length; i++) {
+                let c: string = strValue.charAt(i);
+                if (c == ".") {
+                    bFloatPart = true;
+                    continue;
+                }
+                if (bFloatPart) {
+                    strFloat += c;
+                }
+                else {
+                    strInteger += c;
+                }
+            }
+
+            let intValue: number = parseInt(strInteger);
+            let floatValue: number = parseFloat("0." + strFloat);
+            if (floatValue == 0) {
+                dResult = parseInt(strInteger);
+                return dResult;
+            }
+
+            if (intValue != 0) {
+                if (floatValue <= 0.5) {
+                    floatValue = 0.5;
+                }
+                else {
+                    floatValue = 0.75;
+                }
+
+                dResult = intValue + floatValue;
+            }
+            else {
+                let n: number = 0;
+                for (let i = strFloat.length - 1; i >= 0; i--) {
+                    let c: string = strFloat.charAt(i);
+                    if (c != "0") {
+                        n = i;
+                        break;
+                    }
+                }
+
+                if (n == 0) {
+                    floatValue = 0;
+                }
+                else if (n < maxFloatDigits) {
+                    dResult = parseInt(strInteger) + parseFloat("0." + strFloat);
+                }
+                else {
+                    strFloat = strFloat.substr(n);
+                    let v1: number = 1;
+                    for (let i = 0; i < maxFloatDigits; i++) {
+                        v1 *= 10;
+                    }
+                    let floatTemp: number = parseFloat("0." + strFloat);
+                    floatValue = Math.round(floatTemp * v1) / v1;
+                }
+
+                dResult = floatValue;
+            }
+
+            return dResult;
+        }
+
         public static SetSVGLineAttributes(line: SVGLineElement, id: string, x1: string, y1: string, x2: string, y2: string, strokeWidth: string, stroke: string): void {
             if (this.StringIsNaN(x1) || this.StringIsNaN(y1) || this.StringIsNaN(x2) || this.StringIsNaN(y2)) {
                 return;
@@ -2428,12 +2502,15 @@
                 }
             }
 
-            let dDiff = -999999999;
+            let dDiff = Number.MIN_VALUE;
             for (let i = 0; i < arrAverageDiff.length; i++) {
                 if (arrAverageDiff[i] > dDiff) {
                     dDiff = arrAverageDiff[i];
                 }
             }
+
+            let yAxis: FChartYAxis = this.SearchYAxisByID(YAxisID);
+            dDiff = FChartHelper.RoundFloatNumber(dDiff, yAxis.Tick.MaxFloatDigits);
 
             return dDiff;
         }
@@ -2533,12 +2610,15 @@
                 }
             }
 
-            let dDiff = -999999999;
+            let dDiff: number = Number.MIN_VALUE;
             for (let i = 0; i < arrAverageDiff.length; i++) {
                 if (arrAverageDiff[i] > dDiff) {
                     dDiff = arrAverageDiff[i];
                 }
             }
+
+            let xAxis: FChartXAxis = this.SearchXAxisByID(XAxisID);
+            dDiff = FChartHelper.RoundFloatNumber(dDiff, xAxis.Tick.MaxFloatDigits);
 
             return dDiff;
         }
@@ -3095,8 +3175,8 @@
 
         private CalculateYAxisTickCoordinate() {
             for (let i = 0; i < this.YAxes.length; i++) {
-                let minY = 99999999;
-                let maxY = -99999999;
+                let minY = Number.MAX_VALUE;
+                let maxY = Number.MIN_VALUE;
                 let yaxis: FChartYAxis = this.YAxes[i];
                 if (!yaxis.Show) {
                     continue;
@@ -3185,7 +3265,7 @@
                     let value:number = p * smallScale;
                     let yd:number = y1 + ((nYTicksCount - p) * smallScale) * yPixelsPerValue;
                     let y: number = this.m_coeff.ToWcY(yd);
-                    let strLabel: string = value.toFixed(yaxis.Tick.ValueToFixed);
+                    let strLabel: string = value.toString();
                     yaxis.Value2Wc.push({ Key: strLabel, Value: y });
                 }
 
@@ -3210,8 +3290,8 @@
                     maxX = new Date("1975-01-01 00:00:00").valueOf();
                 }
                 else if (xaxis.Type == XAxisType.Number) {
-                    minX = 99999999;
-                    maxX = -99999999;
+                    minX = Number.MAX_VALUE;
+                    maxX = Number.MIN_VALUE;
                 }
 
                 for (let j = 0; j < this.DataSeries.length; j++) {
@@ -3288,7 +3368,7 @@
                         let dValue: number = p * xaxis.Scale;
                         let xd: number = dValue * xaxis.PixelsPerValue;
                         let x: number = this.m_coeff.ToWcX(xd);
-                        let strLabel: string = dValue.toFixed(xaxis.Tick.ValueToFixed);
+                        let strLabel: string = dValue.toString();
                         xaxis.Value2Wc.push({ Key: strLabel, Value: x });
                     }
                 }
