@@ -1086,8 +1086,9 @@ define(["require", "exports"], function (require, exports) {
             this.Layout = ZoomControlLayout.Right;
             this.HorizontalAlignment = HorizontalAlignment.Left;
             this.VerticalAlignment = VerticalAlignment.Top;
-            this.DefaultShortSize = 50;
+            this.DefaultShortSize = 30;
             this.DefaultLongSize = 300;
+            this.MaxBarSize = 16;
             this.ShortSize = 0;
             this.LongSize = 0;
             this.AttachedChart = null;
@@ -1200,8 +1201,15 @@ define(["require", "exports"], function (require, exports) {
                 FChartHelper.SetSVGLineAttributes(lineBody, "zoomcontrol-body-holder", lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
                 svgZoomControl.appendChild(lineBody);
                 var scale = hb / chart.MaxZoomLevel;
+                var exponent = 0;
+                while (scale > this.MaxBarSize / 2) {
+                    scale /= 2;
+                    exponent++;
+                }
+                var bigScale = scale * Math.pow(2, exponent);
+                var delta = bigScale == scale ? 0 : scale;
                 var bx = cx1;
-                var by = my + 2 * r + (hb - chart.ZoomLevel * scale);
+                var by = my + 2 * r + (hb - (chart.ZoomLevel * bigScale - delta));
                 var bx1 = bx - r;
                 var by1 = by - scale;
                 var bx2 = bx + r;
@@ -1280,7 +1288,14 @@ define(["require", "exports"], function (require, exports) {
                 FChartHelper.SetSVGLineAttributes(lineBody, "zoomcontrol-body-holder", lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
                 svgZoomControl.appendChild(lineBody);
                 var scale = wb / chart.MaxZoomLevel;
-                var bx = mx + 2 * r + chart.ZoomLevel * scale;
+                var exponent = 0;
+                while (scale > this.MaxBarSize / 2) {
+                    scale /= 2;
+                    exponent++;
+                }
+                var bigScale = scale * Math.pow(2, exponent);
+                var delta = bigScale == scale ? 0 : scale;
+                var bx = mx + 2 * r + chart.ZoomLevel * bigScale - delta;
                 var by = my + twothOfH + r;
                 var bx1 = bx - scale;
                 var by1 = by - r;

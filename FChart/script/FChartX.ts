@@ -1151,8 +1151,9 @@
         }
         public HorizontalAlignment: HorizontalAlignment = HorizontalAlignment.Left;
         public VerticalAlignment: VerticalAlignment = VerticalAlignment.Top;
-        public DefaultShortSize: number = 50;
-        public DefaultLongSize: number = 300;
+        private DefaultShortSize: number = 30;
+        private DefaultLongSize: number = 300;
+        private MaxBarSize: number = 16;
         public ShortSize: number = 0;
         public LongSize: number = 0;
 
@@ -1269,8 +1270,15 @@
                 svgZoomControl.appendChild(lineBody);
 
                 let scale: number = hb / chart.MaxZoomLevel;
+                let exponent: number = 0;
+                while (scale > this.MaxBarSize / 2) {
+                    scale /= 2;
+                    exponent++;
+                }
+                let bigScale: number = scale * Math.pow(2, exponent);
+                let delta: number = bigScale == scale ? 0 : scale;
                 let bx: number = cx1;
-                let by: number = my + 2 * r + (hb - chart.ZoomLevel * scale);
+                let by: number = my + 2 * r + (hb - (chart.ZoomLevel * bigScale - delta));
                 let bx1: number = bx - r;
                 let by1: number = by - scale;
                 let bx2: number = bx + r;
@@ -1356,7 +1364,14 @@
                 svgZoomControl.appendChild(lineBody);
 
                 let scale: number = wb / chart.MaxZoomLevel;
-                let bx: number = mx + 2 * r + chart.ZoomLevel * scale;
+                let exponent: number = 0;
+                while (scale > this.MaxBarSize / 2) {
+                    scale /= 2;
+                    exponent++;
+                }
+                let bigScale: number = scale * Math.pow(2, exponent);
+                let delta: number = bigScale == scale ? 0 : scale;
+                let bx: number = mx + 2 * r + chart.ZoomLevel * bigScale - delta;
                 let by: number = my + twothOfH + r;
                 let bx1: number = bx - scale;
                 let by1: number = by - r;
