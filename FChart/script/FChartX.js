@@ -1094,9 +1094,23 @@ define(["require", "exports"], function (require, exports) {
             this.AttachedChart = null;
             this.ZoomInHolder = null;
             this.ZoomOutHolder = null;
-            this.ZoomDragger = null;
-            this.ValueLabel = null;
-            this.Body = null;
+            this.DraggerHolder = null;
+            this.LabelHolder = null;
+            this.ProgressBarHolder = null;
+            this.ZoomInHolderID = "zoomcontrol-zoomin-holder";
+            this.ZoomOutHolderID = "zoomcontrol-zoomout-holder";
+            this.DraggerHolderID = "zoomcontrol-dragger-holder";
+            this.LabelHolderID = "zoomcontrol-label-holder";
+            this.ProgressBarHolderID = "zoomcontrol-progressbar-holder";
+            this.DraggerScale = 0;
+            this.DraggerBigScale = 0;
+            this.CircleRadius = 0;
+            this.DraggerX = 0;
+            this.DraggerY = 0;
+            this.ClickingOnDragger = false;
+            this.DraggingStartPosition = 0;
+            this.DragThreshold = 5;
+            this.Dragging = false;
             this.LineWidth = 2;
         }
         Object.defineProperty(FChartZoomControl.prototype, "Orientation", {
@@ -1149,10 +1163,12 @@ define(["require", "exports"], function (require, exports) {
             }
         };
         FChartZoomControl.prototype.Draw = function (chart) {
+            var _this = this;
             var svgZoomControl = chart.GetSVGSVGElementByID("svg-zoomcontrol");
             if (FChartHelper.ObjectIsNullOrEmpty(svgZoomControl)) {
                 return;
             }
+            this.AttachedChart = chart;
             if (this.Layout == ZoomControlLayout.Left || this.Layout == ZoomControlLayout.Right) {
                 var w = this.ShortSize;
                 var h = this.LongSize;
@@ -1163,12 +1179,15 @@ define(["require", "exports"], function (require, exports) {
                 var twothOfW = w / 2;
                 var eighthOfH = h / 8;
                 var r = Math.min(eighthOfH / 2, twothOfW / 2);
+                this.CircleRadius = r;
                 var hb = h - 4 * r;
                 var cx1 = mx + r;
                 var cy1 = my + 2 * r - r;
                 var circle1 = chart.CreateSVGCircleElement();
-                FChartHelper.SetSVGCircleAttributes(circle1, "zoomcontrol-zoomin-holder", cx1.toString(), cy1.toString(), r.toString(), "none", this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(circle1);
+                FChartHelper.SetSVGCircleAttributes(circle1, this.ZoomInHolderID, cx1.toString(), cy1.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
+                circle1.addEventListener("click", function (e) {
+                    _this.OnZoomIn(e);
+                }, true);
                 var ix1 = cx1;
                 var iy1 = my;
                 var ix2 = cx1;
@@ -1183,22 +1202,28 @@ define(["require", "exports"], function (require, exports) {
                 var lineP2 = chart.CreateSVGLineElement();
                 FChartHelper.SetSVGLineAttributes(lineP2, "zoomcontrol-zoomin-holder-l2", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
                 svgZoomControl.appendChild(lineP2);
+                svgZoomControl.appendChild(circle1);
+                this.ZoomInHolder = circle1;
                 var cx2 = mx + r;
                 var cy2 = my + 2 * r + hb + r;
                 var circle2 = chart.CreateSVGCircleElement();
-                FChartHelper.SetSVGCircleAttributes(circle2, "zoomcontrol-zoomout-holder", cx2.toString(), cy2.toString(), r.toString(), "none", this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(circle2);
+                FChartHelper.SetSVGCircleAttributes(circle2, this.ZoomOutHolderID, cx2.toString(), cy2.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
+                circle2.addEventListener("click", function (e) {
+                    _this.OnZoomOut(e);
+                }, true);
                 iy1 = my + 2 * r + hb + r;
                 iy2 = iy1;
                 var lineP3 = chart.CreateSVGLineElement();
                 FChartHelper.SetSVGLineAttributes(lineP3, "zoomcontrol-zoomout-holder-l1", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
                 svgZoomControl.appendChild(lineP3);
+                svgZoomControl.appendChild(circle2);
+                this.ZoomOutHolder = circle2;
                 var lx1 = cx1;
                 var ly1 = my + 2 * r;
                 var lx2 = cx1;
                 var ly2 = my + 2 * r + hb;
                 var lineBody = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(lineBody, "zoomcontrol-body-holder", lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
+                FChartHelper.SetSVGLineAttributes(lineBody, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
                 svgZoomControl.appendChild(lineBody);
                 var scale = hb / chart.MaxZoomLevel;
                 var exponent = 0;
@@ -1207,9 +1232,13 @@ define(["require", "exports"], function (require, exports) {
                     exponent++;
                 }
                 var bigScale = scale * Math.pow(2, exponent);
+                this.DraggerScale = scale;
+                this.DraggerBigScale = bigScale;
                 var delta = bigScale == scale ? 0 : scale;
                 var bx = cx1;
                 var by = my + 2 * r + (hb - (chart.ZoomLevel * bigScale - delta));
+                this.DraggerX = bx;
+                this.DraggerY = by;
                 var bx1 = bx - r;
                 var by1 = by - scale;
                 var bx2 = bx + r;
@@ -1219,6 +1248,7 @@ define(["require", "exports"], function (require, exports) {
                 var bx4 = bx - r;
                 var by4 = by + scale;
                 var bar = chart.CreateSVGPathElement();
+                bar.setAttribute("id", this.DraggerHolderID);
                 var d = "M" + bx1.toString() + " " + by1.toString() + " " +
                     "L" + bx2.toString() + " " + by2.toString() + " " +
                     "L" + bx3.toString() + " " + by3.toString() + " " +
@@ -1228,14 +1258,15 @@ define(["require", "exports"], function (require, exports) {
                 bar.setAttribute("stroke", this.LineColor);
                 bar.setAttribute("fill", this.LineColor);
                 svgZoomControl.appendChild(bar);
-                var tx = mx + r * 2 + twothOfW / 2;
+                this.DraggerHolder = bar;
+                var tx = mx + r * 2 + twothOfW;
                 var ty = my + 2 * r + hb / 2;
                 var dLabelFontSize = this.FontSize;
                 ty += (dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2);
                 var strLabel = chart.ZoomLevel.toFixed(2);
                 var text = chart.CreateSVGTextElement();
                 var transform = "rotate(270," + tx.toString() + "," + ty.toString() + ")";
-                FChartHelper.SetSVGTextAttributes(text, "zoomcontrol-label", tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor, transform);
+                FChartHelper.SetSVGTextAttributes(text, this.LabelHolderID, tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor, transform);
                 svgZoomControl.appendChild(text);
             }
             else {
@@ -1248,12 +1279,15 @@ define(["require", "exports"], function (require, exports) {
                 var twothOfH = h / 2;
                 var eighthOfW = w / 8;
                 var r = Math.min(eighthOfW / 2, twothOfH / 2);
+                this.CircleRadius = r;
                 var wb = w - 4 * r;
                 var cx1 = mx + r;
                 var cy1 = my + twothOfH + r;
                 var circle1 = chart.CreateSVGCircleElement();
-                FChartHelper.SetSVGCircleAttributes(circle1, "zoomcontrol-zoomin-holder", cx1.toString(), cy1.toString(), r.toString(), "none", this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(circle1);
+                FChartHelper.SetSVGCircleAttributes(circle1, this.ZoomInHolderID, cx1.toString(), cy1.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
+                circle1.addEventListener("click", function (e) {
+                    _this.OnZoomIn(e);
+                }, true);
                 var ix1 = mx;
                 var iy1 = my + twothOfH + r;
                 var ix2 = mx + 2 * r;
@@ -1268,11 +1302,15 @@ define(["require", "exports"], function (require, exports) {
                 var lineP2 = chart.CreateSVGLineElement();
                 FChartHelper.SetSVGLineAttributes(lineP2, "zoomcontrol-zoomin-holder-l2", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
                 svgZoomControl.appendChild(lineP2);
+                svgZoomControl.appendChild(circle1);
+                this.ZoomInHolder = circle1;
                 var cx2 = mx + 2 * r + wb + r;
                 var cy2 = my + twothOfH + r;
                 var circle2 = chart.CreateSVGCircleElement();
-                FChartHelper.SetSVGCircleAttributes(circle2, "zoomcontrol-zoomout-holder", cx2.toString(), cy2.toString(), r.toString(), "none", this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(circle2);
+                FChartHelper.SetSVGCircleAttributes(circle2, this.ZoomOutHolderID, cx2.toString(), cy2.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
+                circle2.addEventListener("click", function (e) {
+                    _this.OnZoomOut(e);
+                }, true);
                 ix1 = mx + 2 * r + wb + r;
                 ix2 = ix1;
                 iy1 = my + twothOfH;
@@ -1280,12 +1318,14 @@ define(["require", "exports"], function (require, exports) {
                 var lineP3 = chart.CreateSVGLineElement();
                 FChartHelper.SetSVGLineAttributes(lineP3, "zoomcontrol-zoomout-holder-l1", ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
                 svgZoomControl.appendChild(lineP3);
+                svgZoomControl.appendChild(circle2);
+                this.ZoomOutHolder = circle2;
                 var lx1 = mx + 2 * r;
                 var ly1 = my + twothOfH + r;
                 var lx2 = lx1 + wb;
                 var ly2 = ly1;
                 var lineBody = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(lineBody, "zoomcontrol-body-holder", lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
+                FChartHelper.SetSVGLineAttributes(lineBody, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
                 svgZoomControl.appendChild(lineBody);
                 var scale = wb / chart.MaxZoomLevel;
                 var exponent = 0;
@@ -1294,9 +1334,13 @@ define(["require", "exports"], function (require, exports) {
                     exponent++;
                 }
                 var bigScale = scale * Math.pow(2, exponent);
+                this.DraggerScale = scale;
+                this.DraggerBigScale = bigScale;
                 var delta = bigScale == scale ? 0 : scale;
                 var bx = mx + 2 * r + chart.ZoomLevel * bigScale - delta;
                 var by = my + twothOfH + r;
+                this.DraggerX = bx;
+                this.DraggerY = by;
                 var bx1 = bx - scale;
                 var by1 = by - r;
                 var bx2 = bx + scale;
@@ -1306,6 +1350,7 @@ define(["require", "exports"], function (require, exports) {
                 var bx4 = bx - scale;
                 var by4 = by + r;
                 var bar = chart.CreateSVGPathElement();
+                bar.setAttribute("id", this.DraggerHolderID);
                 var d = "M" + bx1.toString() + " " + by1.toString() + " " +
                     "L" + bx2.toString() + " " + by2.toString() + " " +
                     "L" + bx3.toString() + " " + by3.toString() + " " +
@@ -1315,14 +1360,162 @@ define(["require", "exports"], function (require, exports) {
                 bar.setAttribute("stroke", this.LineColor);
                 bar.setAttribute("fill", this.LineColor);
                 svgZoomControl.appendChild(bar);
+                this.DraggerHolder = bar;
                 var tx = mx + 2 * r + wb / 2;
                 var ty = my + twothOfH / 2;
                 var dLabelFontSize = this.FontSize;
                 ty += (dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2);
                 var strLabel = chart.ZoomLevel.toFixed(2);
                 var text = chart.CreateSVGTextElement();
-                FChartHelper.SetSVGTextAttributes(text, "zoomcontrol-label", tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor);
+                FChartHelper.SetSVGTextAttributes(text, this.LabelHolderID, tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor);
                 svgZoomControl.appendChild(text);
+            }
+        };
+        FChartZoomControl.prototype.OnZoomIn = function (e) {
+            alert("ZoomIn");
+        };
+        FChartZoomControl.prototype.OnZoomOut = function (e) {
+            alert("ZoomOut");
+        };
+        FChartZoomControl.prototype.OnMouseDown = function (e) {
+            if (FChartHelper.ObjectIsNullOrEmpty(e) || FChartHelper.ObjectIsNullOrEmpty(e.toElement)) {
+                return;
+            }
+            if (e.toElement.id == this.DraggerHolderID) {
+                this.ClickingOnDragger = true;
+                if (this.Orientation == Orientation.Horizontal) {
+                    this.DraggingStartPosition = e.clientX;
+                }
+                else {
+                    this.DraggingStartPosition = e.clientY;
+                }
+            }
+        };
+        FChartZoomControl.prototype.OnMouseUp = function (e) {
+            if (this.Dragging) {
+                this.ClickingOnDragger = false;
+                this.Dragging = false;
+                this.DraggingStartPosition = 0;
+            }
+        };
+        FChartZoomControl.prototype.OnMouseMove = function (e) {
+            if (this.Dragging) {
+                this.ProcessDragging(e);
+                return;
+            }
+            if (this.ClickingOnDragger) {
+                var currentPos = 0;
+                if (this.Orientation == Orientation.Horizontal) {
+                    currentPos = e.clientX;
+                }
+                else {
+                    currentPos = e.clientY;
+                }
+                var delta = Math.abs(currentPos - this.DraggingStartPosition);
+                if (delta >= this.DragThreshold) {
+                    this.Dragging = true;
+                }
+            }
+        };
+        FChartZoomControl.prototype.ProcessDragging = function (e) {
+            var delta = 0;
+            if (this.Orientation == Orientation.Horizontal) {
+                delta = e.clientX - this.DraggingStartPosition;
+                var left = 0;
+                var right = 0;
+                var len = this.AttachedChart.MaxZoomLevel * this.DraggerBigScale;
+                var strX = this.DraggerHolder.getAttribute("x");
+                var x = parseFloat(strX);
+                var mx = this.Margin / 2;
+                var x1 = mx + 2 * this.CircleRadius;
+                var x2 = x1 + len + 2 * this.CircleRadius;
+                var offsetX = mx + this.CircleRadius * 2;
+                left = this.DraggerX - offsetX - this.DraggerScale;
+                right = offsetX + len - this.DraggerX - this.DraggerScale;
+                if (delta == 0) {
+                    return;
+                }
+                var zoomChange = 0;
+                if (delta < 0) {
+                    if (left == 0) {
+                        return;
+                    }
+                    delta = Math.abs(delta);
+                    delta = delta > left ? left : delta;
+                    this.DraggerX -= delta;
+                    zoomChange = -delta / this.DraggerBigScale;
+                }
+                else {
+                    if (right == 0) {
+                        return;
+                    }
+                    delta = delta > right ? right : delta;
+                    this.DraggerX += delta;
+                    zoomChange = delta / this.DraggerBigScale;
+                }
+                var bx1 = this.DraggerX - this.DraggerScale;
+                var by1 = this.DraggerY - this.CircleRadius;
+                var bx2 = this.DraggerX + this.DraggerScale;
+                var by2 = this.DraggerY - this.CircleRadius;
+                var bx3 = this.DraggerX + this.DraggerScale;
+                var by3 = this.DraggerY + this.CircleRadius;
+                var bx4 = this.DraggerX - this.DraggerScale;
+                var by4 = this.DraggerY + this.CircleRadius;
+                var d = "M" + bx1.toString() + " " + by1.toString() + " " +
+                    "L" + bx2.toString() + " " + by2.toString() + " " +
+                    "L" + bx3.toString() + " " + by3.toString() + " " +
+                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
+                this.DraggerHolder.setAttribute("d", d);
+            }
+            else {
+                delta = e.clientY - this.DraggingStartPosition;
+                var bottom = 0;
+                var top_1 = 0;
+                var len = this.AttachedChart.MaxZoomLevel * this.DraggerBigScale;
+                var my = this.Margin / 2;
+                var offsetY = my + this.CircleRadius * 2;
+                bottom = offsetY + len - this.DraggerY - this.DraggerScale;
+                top_1 = this.DraggerY - offsetY - this.DraggerScale;
+                if (delta == 0) {
+                    return;
+                }
+                var zoomChange = 0;
+                if (delta > 0) {
+                    if (bottom == 0) {
+                        return;
+                    }
+                    delta = delta > bottom ? bottom : delta;
+                    this.DraggerY += delta;
+                    zoomChange = -delta / this.DraggerBigScale;
+                }
+                else {
+                    if (top_1 == 0) {
+                        return;
+                    }
+                    delta = Math.abs(delta);
+                    delta = delta > top_1 ? top_1 : delta;
+                    this.DraggerY -= delta;
+                    zoomChange = delta / this.DraggerBigScale;
+                }
+                var bx1 = this.DraggerX - this.CircleRadius;
+                var by1 = this.DraggerY - this.DraggerScale;
+                var bx2 = this.DraggerX + this.CircleRadius;
+                var by2 = this.DraggerY - this.DraggerScale;
+                var bx3 = this.DraggerX + this.CircleRadius;
+                var by3 = this.DraggerY + this.DraggerScale;
+                var bx4 = this.DraggerX - this.CircleRadius;
+                var by4 = this.DraggerY + this.DraggerScale;
+                var d = "M" + bx1.toString() + " " + by1.toString() + " " +
+                    "L" + bx2.toString() + " " + by2.toString() + " " +
+                    "L" + bx3.toString() + " " + by3.toString() + " " +
+                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
+                this.DraggerHolder.setAttribute("d", d);
+            }
+            if (this.Orientation == Orientation.Horizontal) {
+                this.DraggingStartPosition = e.clientX;
+            }
+            else {
+                this.DraggingStartPosition = e.clientY;
             }
         };
         return FChartZoomControl;
@@ -3197,6 +3390,7 @@ define(["require", "exports"], function (require, exports) {
             divContainer.appendChild(this.SVGMeasure);
         };
         FChart.prototype.SetCoordinate = function () {
+            var _this = this;
             var divContainer = document.getElementById(this.BindTo);
             if (FChartHelper.ObjectIsNullOrEmpty(divContainer)) {
                 return;
@@ -3215,6 +3409,18 @@ define(["require", "exports"], function (require, exports) {
             for (var i = 0; i < this.m_arrSVG.length; i++) {
                 this.m_arrSVG[i].onzoom = function (e) { e.cancelBubble = true; alert("svg zoom"); };
             }
+            document.onmousedown = null;
+            document.onmousemove = null;
+            document.onmouseup = null;
+            document.onmousedown = function (e) {
+                _this.ZoomControl.OnMouseDown(e);
+            };
+            document.onmousemove = function (e) {
+                _this.ZoomControl.OnMouseMove(e);
+            };
+            document.onmouseup = function (e) {
+                _this.ZoomControl.OnMouseUp(e);
+            };
         };
         // Resize
         FChart.prototype.OnResize = function (e) {
