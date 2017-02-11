@@ -53,7 +53,8 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         chart.YAxes.push(yaxis2);
         chart.Legend.Show = true;
         chart.Legend.Layout = FChartX.LegendLayout.Top;
-        chart.Legend.ContentLayout = FChartX.LegendContentLayout.Horizontal;
+        chart.Legend.ContentOrientation = FChartX.Orientation.Horizontal;
+        chart.Zoomable = true;
         var serie1 = new FChartX.FChartDataSerie();
         serie1.XAxisID = xaxis1.ID;
         serie1.YAxisID = yaxis1.ID;

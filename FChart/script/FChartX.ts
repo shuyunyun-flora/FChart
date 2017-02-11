@@ -57,7 +57,7 @@
         InnerBottom
     }
 
-    export enum LegendContentLayout {
+    export enum Orientation {
         Horizontal,
         Vertical
     }
@@ -874,7 +874,7 @@
     export class FChartLegend extends ChartGraphObject {
         public LabelFormat: string;
         public Layout: LegendLayout = LegendLayout.Right;
-        public ContentLayout: LegendContentLayout = LegendContentLayout.Vertical;
+        public ContentOrientation: Orientation = Orientation.Vertical;
         public Width: number = 0;
         public Height: number = 0;
         private MinWidth: number = 20;
@@ -896,14 +896,14 @@
 
         public PredictWidth(chart: FChart, w: number) {
             let dLegendItemWidth: number = Math.min(w, this.LEGEND_ITEM_MAX_WIDTH);
-            if (this.ContentLayout == LegendContentLayout.Horizontal) {
+            if (this.ContentOrientation == Orientation.Horizontal) {
                 for (let i = 0; i < chart.DataSeries.length; i++) {
                     if (chart.DataSeries[i].Show) {
                         this.Width += dLegendItemWidth;
                     }
                 }
             }
-            else if (this.ContentLayout == LegendContentLayout.Vertical) {
+            else if (this.ContentOrientation == Orientation.Vertical) {
                 this.Width = dLegendItemWidth;
             }
 
@@ -940,11 +940,11 @@
 
         public PredictHeight(chart: FChart, h: number) {
             let dLegendItemHeight: number = Math.min(h, this.LEGEND_ITEM_MAX_HEIGHT);
-            if (this.ContentLayout == LegendContentLayout.Horizontal) {
+            if (this.ContentOrientation == Orientation.Horizontal) {
 
                 this.Height = dLegendItemHeight;
             }
-            else if (this.ContentLayout == LegendContentLayout.Vertical) {
+            else if (this.ContentOrientation == Orientation.Vertical) {
                 for (let i = 0; i < chart.DataSeries.length; i++) {
                     if (chart.DataSeries[i].Show) {
                         this.Height += dLegendItemHeight;
@@ -998,23 +998,23 @@
 
             this.Width = 0;
             let dLegendItemWidth: number = this.ShapeWidth + this.LabelWidth;
-            if (this.ContentLayout == LegendContentLayout.Horizontal) {
+            if (this.ContentOrientation == Orientation.Horizontal) {
                 for (let i = 0; i < chart.DataSeries.length; i++) {
                     if (chart.DataSeries[i].Show) {
                         this.Width += dLegendItemWidth;
                     }
                 }
             }
-            else if (this.ContentLayout == LegendContentLayout.Vertical) {
+            else if (this.ContentOrientation == Orientation.Vertical) {
                 this.Width = dLegendItemWidth;
             }
 
             this.Height = 0;
             let dLegendItemHeight: number = this.LabelHeight;
-            if (this.ContentLayout == LegendContentLayout.Horizontal) {
+            if (this.ContentOrientation == Orientation.Horizontal) {
                 this.Height = dLegendItemHeight;
             }
-            else if (this.ContentLayout == LegendContentLayout.Vertical) {
+            else if (this.ContentOrientation == Orientation.Vertical) {
                 for (let i = 0; i < chart.DataSeries.length; i++) {
                     if (chart.DataSeries[i].Show) {
                         this.Height += dLegendItemHeight;
@@ -1100,10 +1100,10 @@
                 FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), lbl, "start", this.FontFamily, this.FontStyle, this.FontSizeDraw.toString(), this.FontWeight);
                 svgLegend.appendChild(text);
 
-                if (this.ContentLayout == LegendContentLayout.Vertical) {
+                if (this.ContentOrientation == Orientation.Vertical) {
                     yStart += this.LabelHeight;
                 }
-                else if (this.ContentLayout == LegendContentLayout.Horizontal) {
+                else if (this.ContentOrientation == Orientation.Horizontal) {
                     xStart += (this.ShapeWidth + this.LabelWidth);
                 }
             }
@@ -1118,6 +1118,89 @@
             this.VerticalMeasured = false;
             this.LabelWidth = 0;
             this.LabelHeight = 0;
+        }
+    }
+
+    export enum ZoomControlLayout {
+        Left,
+        Right,
+        Top,
+        Bottom
+    }
+
+    export enum HorizontalAlignment {
+        Left,
+        Center,
+        Right
+    }
+
+    export enum VerticalAlignment {
+        Top,
+        Center,
+        Bottom
+    }
+
+    class FChartZoomControl extends ChartGraphObject {
+        public Layout: ZoomControlLayout = ZoomControlLayout.Right;
+        public get Orientation(): Orientation {
+            if (this.Layout == ZoomControlLayout.Left || this.Layout == ZoomControlLayout.Right) {
+                return Orientation.Vertical;
+            }
+
+            return Orientation.Horizontal;
+        }
+
+        public HorizontalAlignment: HorizontalAlignment = HorizontalAlignment.Left;
+        public VerticalAlignment: VerticalAlignment = VerticalAlignment.Top;
+
+        public DefaultShortSize: number = 50;
+        public DefaultLongSize: number = 300;
+        public ShortSize: number = 0;
+        public LongSize: number = 0;
+
+        private get HorizontalMargin(): number {
+            if (this.Orientation == Orientation.Horizontal) {
+                return (this.LongSize * 0.1);
+            }
+            else {
+                return (this.ShortSize * 0.1);
+            }
+        }
+        private get VerticalMargin(): number {
+            if (this.Orientation == Orientation.Vertical) {
+                return (this.LongSize * 0.1);
+            }
+            else {
+                return (this.ShortSize * 0.1);
+            }
+        }
+
+        public AttachedChart: FChart = null;
+        private ZoomInHolder: SVGCircleElement = null;
+        private ZoomOutHolder: SVGCircleElement = null;
+        private ZoomDragger: SVGPathElement = null;
+        private ValueLabel: SVGTextElement = null;
+        private Body: SVGPathElement = null;
+
+        public CalculateShortSize(availableSpace: number): void {
+            if (availableSpace > this.DefaultShortSize) {
+                this.ShortSize = this.DefaultShortSize;
+            }
+            else {
+                this.ShortSize = availableSpace;
+            }
+        }
+
+        public CalculateLongSize(availableSpace: number): void {
+            if (availableSpace > this.DefaultLongSize) {
+                this.LongSize = this.DefaultLongSize;
+            }
+            else {
+                this.LongSize = availableSpace;
+            }
+        }
+
+        public Draw(chart: FChart): void {
         }
     }
 
@@ -1469,6 +1552,8 @@
         public Legend: FChartLegend = new FChartLegend();
         public Zoom: number = 1.0;
         public ZoomMode: ChartZoomMode = ChartZoomMode.Center;
+        public Zoomable: boolean = false;
+        public ZoomControl: FChartZoomControl = new FChartZoomControl();
 
         public XAxisLeftMargin: number = 10;
         public XAxisRightMargin: number = 50;
@@ -1476,7 +1561,6 @@
         public YAxes: FChartYAxis[] = new Array<FChartYAxis>();
         public AspectRatio: number = 1.0;
         public KeepAspectRatio: boolean = false;            // If false, ignore AspectRatio, If true, consider AspectRatio.
-        public Zoomable: boolean = true;
 
         public SVGMeasure: SVGSVGElement = null;
         private m_arrSVG: SVGSVGElement[] = new Array<SVGSVGElement>();
@@ -2412,16 +2496,42 @@
                     }
                     xAxesHeight = this.FixedXAxesHeight;
                 }
+
+                let availableSpace: number = this.ChartHeight - xAxesHeight;
+                if (this.Zoomable && availableSpace > 0) {
+                    if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
+                        let hz: number = availableSpace * 0.2;
+                        this.ZoomControl.CalculateShortSize(hz);
+                    }
+                }
             }
             else {
                 let nCount: number = this.GetDisplayXAxesCount();
                 let predictHeight: number = this.XAxisDefaultHeight * nCount;
                 let maxHeight: number = 0;
                 if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
-                    maxHeight = h * 0.3;
+                    if (this.Zoomable) {
+                        if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
+                            let hz: number = h * 0.1;
+                            this.ZoomControl.CalculateShortSize(hz);
+                            maxHeight = h * 0.25 + (hz - this.ZoomControl.ShortSize);
+                        }
+                    }
+                    else {
+                        maxHeight = h * 0.3;
+                    }
                 }
                 else {
-                    maxHeight = h * 0.5;
+                    if (this.Zoomable) {
+                        if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
+                            let hz: number = h * 0.1;
+                            this.ZoomControl.CalculateShortSize(hz);
+                            maxHeight = h * 0.4 + (hz - this.ZoomControl.ShortSize);
+                        }
+                    }
+                    else {
+                        maxHeight = h * 0.5;
+                    }
                 }
 
                 if (predictHeight > maxHeight) {
@@ -2451,16 +2561,42 @@
                     }
                     yAxesWidth = this.FixedYAxesWidth;
                 }
+
+                let availableSpace: number = this.ChartWidth - yAxesWidth;
+                if (this.Zoomable && availableSpace > 0) {
+                    if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
+                        let wz: number = availableSpace * 0.2;
+                        this.ZoomControl.CalculateShortSize(wz);
+                    }
+                }
             }
             else {
                 let nCount: number = this.GetDisplayYAxesCount();
                 let predictWidth: number = this.YAxisDefaultWidth * nCount;
                 let maxWidth: number = 0;
                 if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
-                    maxWidth = w * 0.3;
+                    if (this.Zoomable) {
+                        if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
+                            let wz: number = w * 0.1;
+                            this.ZoomControl.CalculateShortSize(wz);
+                            maxWidth = w * 0.25 + (wz - this.ZoomControl.ShortSize);
+                        }
+                    }
+                    else {
+                        maxWidth = w * 0.3;
+                    }
                 }
                 else {
-                    maxWidth = w * 0.5;
+                    if (this.Zoomable) {
+                        if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
+                            let wz: number = w * 0.1;
+                            this.ZoomControl.CalculateShortSize(wz);
+                            maxWidth = w * 0.4 + (wz - this.ZoomControl.ShortSize);
+                        }
+                    }
+                    else {
+                        maxWidth = w * 0.5;
+                    }
                 }
 
                 if (predictWidth > maxWidth) {
@@ -2521,39 +2657,76 @@
                 }
             }
 
-            if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
-                let w: number = this.ChartWidth - yAxesWidth;
-                let h: number = this.ChartHeight - xAxesHeight;
-                this.Legend.PredictWidth(this, w * 0.3);
-                this.Legend.PredictHeight(this, h);
-                this.Legend.CalculateSize(this);
+            let zoomControlWidth: number = 0;
+            let zoomControlHeight: number = 0;
+            if (this.Zoomable) {
+                if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
+                    zoomControlWidth = this.ZoomControl.ShortSize;
+                }
+                if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
+                    zoomControlHeight = this.ZoomControl.ShortSize;
+                }
+            }
 
-                this.PlotWidth = this.ChartWidth - yAxesWidth - this.Legend.Width;
-                this.PlotHeight = this.ChartHeight - xAxesHeight;
+            if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
+                let w: number = this.ChartWidth - yAxesWidth - zoomControlWidth;
+                let h: number = this.ChartHeight - xAxesHeight;
+
+                if (this.Legend.Show) {
+                    this.Legend.PredictWidth(this, w * 0.3);
+                    this.Legend.PredictHeight(this, h);
+                    this.Legend.CalculateSize(this);
+
+                    this.PlotWidth = this.ChartWidth - yAxesWidth - this.Legend.Width - zoomControlWidth;
+                    this.PlotHeight = this.ChartHeight - xAxesHeight - zoomControlHeight;
+                }
+                else {
+                    this.PlotWidth = w;
+                    this.PlotHeight = h;
+                }
             }
             else if (this.Legend.Layout == LegendLayout.InnerLeft || this.Legend.Layout == LegendLayout.InnerRight) {
-                this.PlotWidth = this.ChartWidth - yAxesWidth;
-                this.PlotHeight = this.ChartHeight - xAxesHeight;
-                this.Legend.PredictWidth(this, this.PlotWidth * 0.3);
-                this.Legend.PredictHeight(this, this.PlotHeight);
-                this.Legend.CalculateSize(this);
+                this.PlotWidth = this.ChartWidth - yAxesWidth - zoomControlWidth;
+                this.PlotHeight = this.ChartHeight - xAxesHeight - zoomControlHeight;
+                if (this.Legend.Show) {
+                    this.Legend.PredictWidth(this, this.PlotWidth * 0.3);
+                    this.Legend.PredictHeight(this, this.PlotHeight);
+                    this.Legend.CalculateSize(this);
+                }
             }
             else if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
-                let w: number = this.ChartWidth - yAxesWidth;
-                let h: number = this.ChartHeight - xAxesHeight;
-                this.Legend.PredictWidth(this, w);
-                this.Legend.PredictHeight(this, h * 0.3);
-                this.Legend.CalculateSize(this);
+                let w: number = this.ChartWidth - yAxesWidth - zoomControlWidth;
+                let h: number = this.ChartHeight - xAxesHeight - zoomControlHeight;
+                if (this.Legend.Show) {
+                    this.Legend.PredictWidth(this, w);
+                    this.Legend.PredictHeight(this, h * 0.3);
+                    this.Legend.CalculateSize(this);
 
-                this.PlotWidth = this.ChartWidth - yAxesWidth;
-                this.PlotHeight = this.ChartHeight - xAxesHeight - this.Legend.Height;
+                    this.PlotWidth = this.ChartWidth - yAxesWidth - zoomControlWidth;
+                    this.PlotHeight = this.ChartHeight - xAxesHeight - this.Legend.Height - zoomControlHeight;
+                }
+                else {
+                    this.PlotWidth = w;
+                    this.PlotHeight = h;
+                }
             }
             else if (this.Legend.Layout == LegendLayout.InnerTop || this.Legend.Layout == LegendLayout.InnerBottom) {
-                this.PlotWidth = this.ChartWidth - yAxesWidth;
-                this.PlotHeight = this.ChartHeight - xAxesHeight;
-                this.Legend.PredictWidth(this, this.PlotWidth);
-                this.Legend.PredictHeight(this, this.PlotHeight * 0.3);
-                this.Legend.CalculateSize(this);
+                this.PlotWidth = this.ChartWidth - yAxesWidth - zoomControlWidth;
+                this.PlotHeight = this.ChartHeight - xAxesHeight - zoomControlHeight;
+                if (this.Legend.Show) {
+                    this.Legend.PredictWidth(this, this.PlotWidth);
+                    this.Legend.PredictHeight(this, this.PlotHeight * 0.3);
+                    this.Legend.CalculateSize(this);
+                }
+            }
+
+            if (this.Zoomable) {
+                if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
+                    this.ZoomControl.CalculateLongSize(this.PlotHeight);
+                }
+                else if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
+                    this.ZoomControl.CalculateLongSize(this.PlotWidth);
+                }
             }
 
             this.m_width = this.PlotWidth;
@@ -2594,6 +2767,27 @@
 
             let xStart = 0;
             let yStart = 0;
+
+            let zoomControlWidth: number = 0;
+            let zoomControlHeight: number = 0;
+            if (this.Zoomable) {
+                if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
+                    zoomControlWidth = this.ZoomControl.ShortSize;
+                }
+                if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
+                    zoomControlHeight = this.ZoomControl.ShortSize;
+                }
+            }
+
+            if (this.Zoomable && this.ZoomControl.Layout == ZoomControlLayout.Left) {
+                this.ZoomControl.X = xStart;
+                xStart += zoomControlWidth;
+            }
+            if (this.Zoomable && this.ZoomControl.Layout == ZoomControlLayout.Top) {
+                this.ZoomControl.Y = yStart;
+                yStart += zoomControlHeight;
+            }
+
             if (nDisplayXAxesCount == 1) {
                 yStart += xaxis.Height / 2;
             }
@@ -2647,6 +2841,8 @@
             if (this.Legend.Show && this.Legend.Layout == LegendLayout.Right) {
                 this.Legend.X = xStart;
                 this.Legend.Y = yStart + this.m_height / 2 - this.Legend.Height / 2;
+
+                xStart += this.Legend.Width;
             }
 
             this.PlotPartY = yStart;
@@ -2667,9 +2863,43 @@
                 this.Legend.X = keepXStart + this.PlotWidth / 2 - this.Legend.Width / 2;
                 if (nDisplayXAxesCount == 1) {
                     this.Legend.Y = yStart - xaxis.Height / 2;
+                    yStart = this.Legend.Y + this.Legend.Height;
                 }
                 else {
                     this.Legend.Y = yStart;
+                    yStart += this.Legend.Height;
+                }
+            }
+
+            if (this.Zoomable && this.ZoomControl.Layout == ZoomControlLayout.Right) {
+                this.ZoomControl.X = xStart;
+            }
+            if (this.Zoomable && this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
+                this.ZoomControl.Y = yStart;
+            }
+
+            if (this.Zoomable) {
+                if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
+                    if (this.ZoomControl.VerticalAlignment == VerticalAlignment.Top) {
+                        this.ZoomControl.Y = this.PlotPartY;
+                    }
+                    else if (this.ZoomControl.VerticalAlignment == VerticalAlignment.Center) {
+                        this.ZoomControl.Y = this.PlotPartY + this.PlotHeight / 2 - this.ZoomControl.LongSize / 2;
+                    }
+                    else if (this.ZoomControl.VerticalAlignment == VerticalAlignment.Bottom) {
+                        this.ZoomControl.Y = this.PlotPartY + this.PlotHeight - this.ZoomControl.LongSize;
+                    }
+                }
+                if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
+                    if (this.ZoomControl.HorizontalAlignment == HorizontalAlignment.Left) {
+                        this.ZoomControl.X = this.PlotPartX;
+                    }
+                    else if (this.ZoomControl.HorizontalAlignment == HorizontalAlignment.Center) {
+                        this.ZoomControl.X = this.PlotPartX + this.PlotWidth / 2 - this.ZoomControl.LongSize / 2;
+                    }
+                    else if (this.ZoomControl.HorizontalAlignment == HorizontalAlignment.Right) {
+                        this.ZoomControl.X = this.PlotPartX + this.PlotWidth - this.ZoomControl.LongSize;
+                    }
                 }
             }
         }
@@ -2971,6 +3201,24 @@
                 let svgLegend: SVGSVGElement = this.CreateSVG("svg-legend", "absolute", this.Legend.X.toString(), this.Legend.Y.toString(), this.Legend.Width.toString(), this.Legend.Height.toString());
                 divContainer.appendChild(svgLegend);
                 this.m_arrSVG.push(svgLegend);
+            }
+
+            if (this.Zoomable) {
+                let wz: number = 0;
+                let hz: number = 0;
+                if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
+                    wz = this.ZoomControl.ShortSize;
+                    hz = this.ZoomControl.LongSize;
+                }
+                else if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
+                    wz = this.ZoomControl.LongSize;
+                    hz = this.ZoomControl.ShortSize;
+                }
+                let svgZoomControl: SVGSVGElement = this.CreateSVG("svg-zoomcontrol", "absolute", this.ZoomControl.X.toString(), this.ZoomControl.Y.toString(), wz.toString(), hz.toString());
+                divContainer.appendChild(svgZoomControl);
+                this.m_arrSVG.push(svgZoomControl);
+
+                svgZoomControl.style.setProperty("background-color", "magenta");
             }
         }
 
