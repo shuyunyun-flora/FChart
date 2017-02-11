@@ -308,6 +308,8 @@ define(["require", "exports"], function (require, exports) {
             }
             FChartHelper.SetSVGLineAttributes(xAxisLine, "xaxis-line" + this.ID, x.toString(), y.toString(), svg.clientWidth.toString(), y.toString(), this.LineWidth.toString(), this.LineColor);
             svg.appendChild(xAxisLine);
+            var arrXTickLabels = new Array();
+            var minXTickLabelFontSize = 2000;
             for (var i = 0; i < this.Value2Wc.length; i++) {
                 var obj = this.Value2Wc[i];
                 var value = obj.Key;
@@ -334,6 +336,7 @@ define(["require", "exports"], function (require, exports) {
                 FChartHelper.SetSVGTextAttributes(tickLabel, tickLabelId, lx.toString(), ly.toString(), value, "middle", this.Tick.FontFamily, this.Tick.FontStyle, this.Tick.FontSize.toString(), this.Tick.FontWeight);
                 var textInfo = chart.GetAppropriateFontSizeForText(tickLabel, xTickLabelFontSize, xTickLabelMaxWidth);
                 xTickLabelFontSize = textInfo.Key;
+                minXTickLabelFontSize = xTickLabelFontSize < minXTickLabelFontSize ? xTickLabelFontSize : minXTickLabelFontSize;
                 lx = ix;
                 ly = fifthOfHalfH * 2;
                 if (this.Tick.LabelLayout == TickLabelLayout.CenterOfTick) {
@@ -345,6 +348,10 @@ define(["require", "exports"], function (require, exports) {
                 tickLabel.setAttribute("x", lx.toString());
                 tickLabel.setAttribute("y", ly.toString());
                 svg.appendChild(tickLabel);
+                arrXTickLabels.push(tickLabel);
+            }
+            for (var i = 0; i < arrXTickLabels.length; i++) {
+                arrXTickLabels[i].setAttribute("font-size", minXTickLabelFontSize.toString());
             }
             // Draw Title
             this.DrawTitle(chart);
@@ -2122,7 +2129,7 @@ define(["require", "exports"], function (require, exports) {
                     if (isNaN(this.FixedXAxesHeight) || this.FixedXAxesHeight <= 0 || this.FixedXAxesHeight > 1) {
                         this.FixedXAxesHeight = 0.5;
                     }
-                    xAxesHeight = this.ChartWidth * this.FixedXAxesHeight;
+                    xAxesHeight = this.ChartHeight * this.FixedXAxesHeight;
                 }
                 else if (this.FixedXAxesLengthType == LengthType.Value) {
                     if (this.FixedXAxesHeight > this.ChartHeight) {

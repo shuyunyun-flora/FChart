@@ -6,6 +6,9 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
     function DemoChart() {
         var chart = new FChartX.FChart();
         chart.BindTo = "divDemoChart";
+        chart.UseFixedXAxesHeight = true;
+        chart.FixedXAxesLengthType = FChartX.LengthType.Percentage;
+        chart.FixedXAxesHeight = 0.3;
         var xaxis1 = new FChartX.FChartXAxis();
         xaxis1.Show = true;
         xaxis1.ID = "XAxis-1";
@@ -49,8 +52,8 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         yaxis2.Title.Label = "Y axis Title 2";
         chart.YAxes.push(yaxis2);
         chart.Legend.Show = true;
-        chart.Legend.Layout = FChartX.LegendLayout.InnerRight;
-        chart.Legend.ContentLayout = FChartX.LegendContentLayout.Vertical;
+        chart.Legend.Layout = FChartX.LegendLayout.Top;
+        chart.Legend.ContentLayout = FChartX.LegendContentLayout.Horizontal;
         var serie1 = new FChartX.FChartDataSerie();
         serie1.XAxisID = xaxis1.ID;
         serie1.YAxisID = yaxis1.ID;
