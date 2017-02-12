@@ -314,7 +314,7 @@ define(["require", "exports"], function (require, exports) {
                 var obj = this.Value2Wc[i];
                 var value = obj.Key;
                 var wcx = obj.Value;
-                var ix = chart.PlotX + chart.m_coeff.ToDvcX(wcx);
+                var ix = chart.PlotXStart + chart.m_coeff.ToDvcX(wcx);
                 var tickLine = chart.CreateSVGLineElement();
                 var tickLineId = "xaxis-tick-" + this.ID + "-" + ix.toString();
                 var fifthOfHalfH = this.Height / 2 * 0.2;
@@ -586,7 +586,7 @@ define(["require", "exports"], function (require, exports) {
                 var data = this.Data[i];
                 var x = data.fx;
                 var y = data.fy;
-                var ix = chart.PlotX + chart.m_coeff.ToDvcX(x);
+                var ix = chart.PlotXStart + chart.m_coeff.ToDvcX(x);
                 var iy = chart.m_coeff.ToDvcY(y);
                 var pt = svgChart.createSVGPoint();
                 pt.x = ix;
@@ -601,7 +601,7 @@ define(["require", "exports"], function (require, exports) {
             }
             for (var i = 0; i < this.Data.length; i++) {
                 var data = this.Data[i];
-                var ix = chart.PlotX + chart.m_coeff.ToDvcX(data.fx);
+                var ix = chart.PlotXStart + chart.m_coeff.ToDvcX(data.fx);
                 var iy = chart.m_coeff.ToDvcY(data.fy);
                 if (data.Show) {
                     // Draw mark.
@@ -1556,14 +1556,25 @@ define(["require", "exports"], function (require, exports) {
             this.RightVerticalBarPosition = new FloatPoint(0, 0);
             this.LeftMask = null;
             this.RightMask = null;
+            this.LeftTopCorner = null;
+            this.LeftBottomCorner = null;
+            this.RightTopCorner = null;
+            this.RightBottomCorner = null;
             this.LeftBar = null;
             this.RightBar = null;
             this.TopBar = null;
             this.BottomBar = null;
+            this.LeftDraggerID = "rangecontrol-dragger-left";
+            this.RightDraggerID = "rangecontrol-dragger-right";
             this.DEFAULT_HORIZONTAL_BAR_SIZE = 20;
             this.DEFAULT_VERTICAL_BAR_SIZE = 20;
             this.m_dHorizontalBarSize = this.DEFAULT_HORIZONTAL_BAR_SIZE;
             this.m_dVerticalBarSize = this.DEFAULT_VERTICAL_BAR_SIZE;
+            this.DraggingStartPosition = 0;
+            this.DragThreshold = 5;
+            this.Dragging = false;
+            this.ClickingOnLeftDragger = false;
+            this.ClickingOnRightDragger = false;
         }
         Object.defineProperty(FChartRangeControl.prototype, "HorizontalBarSize", {
             get: function () {
@@ -1622,6 +1633,7 @@ define(["require", "exports"], function (require, exports) {
             this.AttachedChart = chart;
             this.m_dHorizontalBarSize = this.DEFAULT_HORIZONTAL_BAR_SIZE;
             this.m_dVerticalBarSize = this.DEFAULT_VERTICAL_BAR_SIZE;
+            this.ClearContent();
             this.DrawCorner();
             this.DrawBar();
             this.DrawDragger();
@@ -1651,8 +1663,8 @@ define(["require", "exports"], function (require, exports) {
             var largeArc = 0;
             var xAxisRotation = 0;
             var sweep = 1;
-            var svgArc = this.AttachedChart.CreateSVG(id, "absolute", x.toString(), y.toString(), w.toString(), h.toString());
-            this.AttachedChart.AppendSVGToContainer(svgArc);
+            var svgCorner = this.AttachedChart.CreateSVG(id, "absolute", x.toString(), y.toString(), w.toString(), h.toString());
+            this.AttachedChart.AppendSVGToContainer(svgCorner);
             var fillColor = "lightgray";
             var x1 = (dock == RangeControlCornerDock.LeftTop || dock == RangeControlCornerDock.RightTop) ? 0 : w;
             var y1 = (dock == RangeControlCornerDock.LeftTop || dock == RangeControlCornerDock.LeftBottom) ? h : 0;
@@ -1662,9 +1674,18 @@ define(["require", "exports"], function (require, exports) {
             var oy = (dock == RangeControlCornerDock.LeftTop || dock == RangeControlCornerDock.RightTop) ? h : 0;
             var arc = this.AttachedChart.CreateArc(x1, y1, x2, y2, rx, ry, xAxisRotation, largeArc, sweep, ox, oy, this.LineWidth, fillColor, true, fillColor);
             arc.setAttribute("id", id + "-arc");
-            svgArc.appendChild(arc);
-            if (dock == RangeControlCornerDock.LeftBottom) {
-                var i = 0;
+            svgCorner.appendChild(arc);
+            if (dock == RangeControlCornerDock.LeftTop) {
+                this.LeftTopCorner = svgCorner;
+            }
+            else if (dock == RangeControlCornerDock.LeftBottom) {
+                this.LeftBottomCorner = svgCorner;
+            }
+            else if (dock == RangeControlCornerDock.RightTop) {
+                this.RightTopCorner = svgCorner;
+            }
+            else if (dock == RangeControlCornerDock.RightBottom) {
+                this.RightBottomCorner = svgCorner;
             }
         };
         FChartRangeControl.prototype.DrawBar = function () {
@@ -1694,6 +1715,7 @@ define(["require", "exports"], function (require, exports) {
             }
             w = (dock == RangeControlBarDock.Left || dock == RangeControlBarDock.Right) ? this.VerticalBarWidth : this.HorizontalBarWidth;
             h = (dock == RangeControlBarDock.Left || dock == RangeControlBarDock.Right) ? this.VerticalBarHeight : this.HorizontalBarHeight;
+            w = w > 0 ? w : 0;
             var svgBar = this.AttachedChart.CreateSVG(id, "absolute", lx.toString(), ly.toString(), w.toString(), h.toString());
             this.AttachedChart.AppendSVGToContainer(svgBar);
             svgBar.style.setProperty("background-color", "lightgray");
@@ -1703,8 +1725,8 @@ define(["require", "exports"], function (require, exports) {
             this.BottomBar = dock == RangeControlBarDock.Bottom ? svgBar : this.BottomBar;
         };
         FChartRangeControl.prototype.DrawDragger = function () {
-            this.DrawDraggerGraph("rangecontrol-dragger-left", RangeControlDraggerDock.Left);
-            this.DrawDraggerGraph("rangecontrol-dragger-right", RangeControlDraggerDock.Right);
+            this.DrawDraggerGraph(this.LeftDraggerID, RangeControlDraggerDock.Left);
+            this.DrawDraggerGraph(this.RightDraggerID, RangeControlDraggerDock.Right);
         };
         FChartRangeControl.prototype.DrawDraggerGraph = function (id, dock) {
             var tenthOfW = this.VerticalBarWidth / 10;
@@ -1740,11 +1762,21 @@ define(["require", "exports"], function (require, exports) {
             svgBar.appendChild(dragger);
         };
         FChartRangeControl.prototype.DrawMask = function () {
+            var plotWidth = this.AttachedChart.GetPlotWidth();
+            var plotHeight = this.AttachedChart.GetPlotHeight();
             var x = 0;
             var y = 0;
             var w = 0;
-            var h = 0;
+            var h = plotHeight;
+            x = this.AttachedChart.GetPlotX();
+            y = this.AttachedChart.GetPlotY();
+            w = this.LeftVerticalBarPosition.X - this.AttachedChart.GetPlotX();
+            w = w < 0 ? 0 : w;
             this.DrawMaskGraph("svg-rangecontrol-mask-left", x, y, w, h, RangeControlMaskDock.Left);
+            x = this.RightVerticalBarPosition.X + this.VerticalBarWidth;
+            y = this.AttachedChart.GetPlotY();
+            w = this.AttachedChart.GetPlotX() + plotWidth - x;
+            w = w < 0 ? 0 : w;
             this.DrawMaskGraph("svg-rangecontrol-mask-right", x, y, w, h, RangeControlMaskDock.Right);
         };
         FChartRangeControl.prototype.DrawMaskGraph = function (id, x, y, w, h, dock) {
@@ -1754,6 +1786,102 @@ define(["require", "exports"], function (require, exports) {
             this.AttachedChart.AppendSVGToContainer(mask);
             this.LeftMask = dock == RangeControlMaskDock.Left ? mask : this.LeftMask;
             this.RightMask = dock == RangeControlMaskDock.Right ? mask : this.RightMask;
+        };
+        FChartRangeControl.prototype.ClearContent = function () {
+            if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
+                return;
+            }
+            this.AttachedChart.RemoveSVGFromContainer(this.LeftTopCorner);
+            this.AttachedChart.RemoveSVGFromContainer(this.LeftBottomCorner);
+            this.AttachedChart.RemoveSVGFromContainer(this.RightTopCorner);
+            this.AttachedChart.RemoveSVGFromContainer(this.RightBottomCorner);
+            this.AttachedChart.RemoveSVGFromContainer(this.LeftBar);
+            this.AttachedChart.RemoveSVGFromContainer(this.RightBar);
+            this.AttachedChart.RemoveSVGFromContainer(this.TopBar);
+            this.AttachedChart.RemoveSVGFromContainer(this.BottomBar);
+            this.AttachedChart.RemoveSVGFromContainer(this.LeftMask);
+            this.AttachedChart.RemoveSVGFromContainer(this.RightMask);
+        };
+        FChartRangeControl.prototype.OnMouseDown = function (e) {
+            if (FChartHelper.ObjectIsNullOrEmpty(e) || FChartHelper.ObjectIsNullOrEmpty(e.toElement)) {
+                return;
+            }
+            if (e.toElement.id == this.LeftDraggerID || e.toElement.id == this.RightDraggerID) {
+                if (e.toElement.id == this.LeftDraggerID) {
+                    this.ClickingOnLeftDragger = true;
+                }
+                else {
+                    this.ClickingOnRightDragger = true;
+                }
+                this.DraggingStartPosition = e.clientX;
+            }
+        };
+        FChartRangeControl.prototype.OnMouseMove = function (e) {
+            if (FChartHelper.ObjectIsNullOrEmpty(e) || FChartHelper.ObjectIsNullOrEmpty(e.toElement)) {
+                return;
+            }
+            if (this.Dragging) {
+                this.ProcessDragging(e);
+                return;
+            }
+            if (this.ClickingOnLeftDragger || this.ClickingOnRightDragger) {
+                var currentPos = e.clientX;
+                var delta = Math.abs(currentPos - this.DraggingStartPosition);
+                if (delta >= this.DragThreshold) {
+                    this.Dragging = true;
+                }
+            }
+        };
+        FChartRangeControl.prototype.OnMouseUp = function (e) {
+            if (FChartHelper.ObjectIsNullOrEmpty(e) || FChartHelper.ObjectIsNullOrEmpty(e.toElement)) {
+                return;
+            }
+            if (this.Dragging) {
+                this.ClickingOnLeftDragger = false;
+                this.ClickingOnRightDragger = false;
+                this.Dragging = false;
+            }
+        };
+        FChartRangeControl.prototype.ProcessDragging = function (e) {
+            if (FChartHelper.ObjectIsNullOrEmpty(e)) {
+                return;
+            }
+            var plotWidth = this.AttachedChart.GetSVGSVGElementByID("svg-plot").clientWidth;
+            var space1 = plotWidth * this.AttachedChart.PlotLeftRange;
+            var space2 = plotWidth * (this.AttachedChart.PlotRightRange - this.AttachedChart.PlotLeftRange);
+            var space3 = plotWidth * (1 - this.AttachedChart.PlotRightRange);
+            var space = 0;
+            var delta = e.clientX - this.DraggingStartPosition;
+            var direction = delta > 0 ? "R" : "L";
+            delta = Math.abs(delta);
+            if (this.ClickingOnLeftDragger) {
+                if (direction == "R") {
+                    delta = delta > space2 ? space2 : delta;
+                    this.AttachedChart.PlotLeftRange = (space1 + delta) / plotWidth;
+                }
+                else {
+                    delta = delta > space1 ? space1 : delta;
+                    this.AttachedChart.PlotLeftRange = (space1 - delta) / plotWidth;
+                }
+                var delta2 = direction == "R" ? delta : -delta;
+                this.TopHorizontalBarPosition.X += delta2;
+                this.BottomHorizontalBarPosition.X += delta2;
+                this.LeftVerticalBarPosition.X += delta2;
+            }
+            else if (this.ClickingOnRightDragger) {
+                if (direction == "R") {
+                    delta = delta > space3 ? space3 : delta;
+                    this.AttachedChart.PlotRightRange = (plotWidth * this.AttachedChart.PlotRightRange + delta) / plotWidth;
+                }
+                else {
+                    delta = delta > space2 ? space2 : delta;
+                    this.AttachedChart.PlotRightRange = (plotWidth * this.AttachedChart.PlotRightRange - delta) / plotWidth;
+                }
+                var delta2 = direction == "R" ? delta : -delta;
+                this.RightVerticalBarPosition.X += delta2;
+            }
+            this.DraggingStartPosition = e.clientX;
+            this.Draw(this.AttachedChart);
         };
         return FChartRangeControl;
     }(ChartGraphObject));
@@ -2146,11 +2274,12 @@ define(["require", "exports"], function (require, exports) {
             this.GridY = new FChartGrid();
             this.Tooltip = new FChartTooltip();
             this.DrawDataPoint = function (data) { };
-            this.PlotPartX = 0;
-            this.PlotPartY = 0;
+            this.PlotPosition = new FloatPoint(0, 0);
             this.ZoomFactor = 1.2;
             this.SCALE_ULIMIT = 0.002;
             this.SCALE_LLIMIT = 1000;
+            this.PlotLeftRange = 0;
+            this.PlotRightRange = 0;
             this.m_coeff = new FChartCoeff();
             this.m_scale = 0.0;
             this.Container = null;
@@ -2239,7 +2368,7 @@ define(["require", "exports"], function (require, exports) {
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(FChart.prototype, "PlotX", {
+        Object.defineProperty(FChart.prototype, "PlotXStart", {
             get: function () {
                 return this.XAxisLeftMargin > 0 ? this.XAxisLeftMargin : 0;
             },
@@ -2392,6 +2521,8 @@ define(["require", "exports"], function (require, exports) {
             this.PrepareContainer();
             this.SetCoordinate();
             this.Draw();
+            this.PlotLeftRange = 0;
+            this.PlotRightRange = 1;
             this.WindowDevicePixelRatio = this.GetWindowDevicePixelRatio();
             window.onresize = function (e) {
                 if (_this.DetectZoom()) {
@@ -2463,7 +2594,7 @@ define(["require", "exports"], function (require, exports) {
                     var obj = xaxis.Value2Wc[i];
                     var key = obj.Key;
                     var value = obj.Value;
-                    var ix = this.PlotX + this.m_coeff.ToDvcX(value);
+                    var ix = this.PlotXStart + this.m_coeff.ToDvcX(value);
                     var y1 = 0;
                     var y2 = plotHeight;
                     var id = xaxis.ID + "-x-gridline-" + i.toString();
@@ -2478,7 +2609,7 @@ define(["require", "exports"], function (require, exports) {
                 if (FChartHelper.ObjectIsNullOrEmpty(xaxis)) {
                     continue;
                 }
-                var ix = this.PlotX + xaxis.GetCoordByValue(gridline.Value);
+                var ix = this.PlotXStart + xaxis.GetCoordByValue(gridline.Value);
                 var y1 = 0;
                 var y2 = plotHeight;
                 var line = this.CreateSVGLineElement();
@@ -2515,8 +2646,8 @@ define(["require", "exports"], function (require, exports) {
                     var key = obj.Key;
                     var value = obj.Value;
                     var iy = this.m_coeff.ToDvcY(value);
-                    var x1 = this.PlotX;
-                    var x2 = this.PlotX + plotWidth;
+                    var x1 = this.PlotXStart;
+                    var x2 = this.PlotXStart + plotWidth;
                     if (key == "top" || key == "bottom") {
                         continue;
                     }
@@ -2533,8 +2664,8 @@ define(["require", "exports"], function (require, exports) {
                     continue;
                 }
                 var iy = yaxis.GetCoordByValue(gridline.Value);
-                var x1 = this.PlotX;
-                var x2 = this.PlotX + plotWidth;
+                var x1 = this.PlotXStart;
+                var x2 = this.PlotXStart + plotWidth;
                 var line = this.CreateSVGLineElement();
                 var id = yaxis.ID + "-y-extra-gridline-" + i.toString();
                 FChartHelper.SetSVGLineAttributes(line, id, x1.toString(), iy.toString(), x2.toString(), iy.toString(), gridline.LineWidth.toString(), gridline.LineColor);
@@ -2557,7 +2688,7 @@ define(["require", "exports"], function (require, exports) {
                     lx = plotWidth;
                     textAnchor = "end";
                 }
-                lx += this.PlotX;
+                lx += this.PlotXStart;
                 var text = this.CreateSVGTextElement();
                 var textID = yaxis.ID + "-y-extra-gridline-text-" + i.toString();
                 FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), gridline.Text, textAnchor, gridline.FontFamily, gridline.FontStyle, gridline.FontSize.toString(), gridline.FontWeight);
@@ -2697,6 +2828,20 @@ define(["require", "exports"], function (require, exports) {
         FChart.prototype.GetPlotSVG = function () {
             var plotID = "svg-plot";
             return this.GetSVGSVGElementByID(plotID);
+        };
+        FChart.prototype.GetPlotWidth = function () {
+            var svgPlot = this.GetPlotSVG();
+            return svgPlot.clientWidth;
+        };
+        FChart.prototype.GetPlotHeight = function () {
+            var svgPlot = this.GetPlotSVG();
+            return svgPlot.clientHeight;
+        };
+        FChart.prototype.GetPlotX = function () {
+            return this.PlotPosition.X;
+        };
+        FChart.prototype.GetPlotY = function () {
+            return this.PlotPosition.Y;
         };
         FChart.prototype.GetLegendSVG = function () {
             var legendID = "svg-legend";
@@ -3259,7 +3404,7 @@ define(["require", "exports"], function (require, exports) {
                 }
             }
             var keepXStart = xStart;
-            this.PlotPartX = xStart;
+            this.PlotPosition.X = xStart;
             xStart += this.PlotWidth;
             this.RangeControl.RightVerticalBarPosition.X = xStart;
             xStart += rangeControlWidth / 2;
@@ -3273,7 +3418,7 @@ define(["require", "exports"], function (require, exports) {
                 this.Legend.Y = yStart + this.m_height / 2 - this.Legend.Height / 2;
                 xStart += this.Legend.Width;
             }
-            this.PlotPartY = yStart;
+            this.PlotPosition.Y = yStart;
             yStart += this.PlotHeight;
             this.RangeControl.BottomHorizontalBarPosition.Y = yStart;
             yStart += rangeControlHeight / 2;
@@ -3306,24 +3451,24 @@ define(["require", "exports"], function (require, exports) {
             if (this.Zoomable) {
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                     if (this.ZoomControl.VerticalAlignment == VerticalAlignment.Top) {
-                        this.ZoomControl.Y = this.PlotPartY;
+                        this.ZoomControl.Y = this.PlotPosition.Y;
                     }
                     else if (this.ZoomControl.VerticalAlignment == VerticalAlignment.Center) {
-                        this.ZoomControl.Y = this.PlotPartY + this.PlotHeight / 2 - this.ZoomControl.LongSize / 2;
+                        this.ZoomControl.Y = this.PlotPosition.Y + this.PlotHeight / 2 - this.ZoomControl.LongSize / 2;
                     }
                     else if (this.ZoomControl.VerticalAlignment == VerticalAlignment.Bottom) {
-                        this.ZoomControl.Y = this.PlotPartY + this.PlotHeight - this.ZoomControl.LongSize;
+                        this.ZoomControl.Y = this.PlotPosition.Y + this.PlotHeight - this.ZoomControl.LongSize;
                     }
                 }
                 if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                     if (this.ZoomControl.HorizontalAlignment == HorizontalAlignment.Left) {
-                        this.ZoomControl.X = this.PlotPartX;
+                        this.ZoomControl.X = this.PlotPosition.X;
                     }
                     else if (this.ZoomControl.HorizontalAlignment == HorizontalAlignment.Center) {
-                        this.ZoomControl.X = this.PlotPartX + this.PlotWidth / 2 - this.ZoomControl.LongSize / 2;
+                        this.ZoomControl.X = this.PlotPosition.X + this.PlotWidth / 2 - this.ZoomControl.LongSize / 2;
                     }
                     else if (this.ZoomControl.HorizontalAlignment == HorizontalAlignment.Right) {
-                        this.ZoomControl.X = this.PlotPartX + this.PlotWidth - this.ZoomControl.LongSize;
+                        this.ZoomControl.X = this.PlotPosition.X + this.PlotWidth - this.ZoomControl.LongSize;
                     }
                 }
             }
@@ -3551,8 +3696,14 @@ define(["require", "exports"], function (require, exports) {
             if (FChartHelper.ObjectIsNullOrEmpty(svg)) {
                 return;
             }
-            this.m_arrSVG.push(svg);
             this.Container.appendChild(svg);
+        };
+        FChart.prototype.RemoveSVGFromContainer = function (svg) {
+            if (FChartHelper.ObjectIsNullOrEmpty(svg)) {
+                return;
+            }
+            this.Container.removeChild(svg);
+            svg = null;
         };
         FChart.prototype.CreateSVG = function (id, position, left, top, width, height) {
             var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -3574,16 +3725,16 @@ define(["require", "exports"], function (require, exports) {
                     this.m_arrSVG.push(svgY);
                 }
             }
-            var svgPlot = this.CreateSVG("svg-plot", "absolute", this.PlotPartX.toString(), this.PlotPartY.toString(), this.PlotWidth.toString(), this.PlotHeight.toString());
+            var svgPlot = this.CreateSVG("svg-plot", "absolute", this.PlotPosition.X.toString(), this.PlotPosition.Y.toString(), this.PlotWidth.toString(), this.PlotHeight.toString());
             divContainer.appendChild(svgPlot);
             this.m_arrSVG.push(svgPlot);
             var nXCount = this.GetDisplayXAxesCount();
             if (nXCount == 1) {
                 var xaxis = this.GetXAxis();
-                var svgTop = this.CreateSVG("svg-xaxis-top", "absolute", this.PlotPartX.toString(), "0", this.PlotWidth.toString(), (xaxis.Height / 2).toString());
+                var svgTop = this.CreateSVG("svg-xaxis-top", "absolute", this.PlotPosition.X.toString(), "0", this.PlotWidth.toString(), (xaxis.Height / 2).toString());
                 divContainer.appendChild(svgTop);
                 this.m_arrSVG.push(svgTop);
-                var svgBottom = this.CreateSVG("svg-xaxis-bottom", "absolute", this.PlotPartX.toString(), (this.PlotPartY + this.m_height).toString(), this.PlotWidth.toString(), (xaxis.Height / 2).toString());
+                var svgBottom = this.CreateSVG("svg-xaxis-bottom", "absolute", this.PlotPosition.X.toString(), (this.PlotPosition.Y + this.m_height).toString(), this.PlotWidth.toString(), (xaxis.Height / 2).toString());
                 svgBottom.style.setProperty("background-color", "none");
                 divContainer.appendChild(svgBottom);
                 this.m_arrSVG.push(svgBottom);
@@ -3744,12 +3895,15 @@ define(["require", "exports"], function (require, exports) {
             document.onmouseup = null;
             document.onmousedown = function (e) {
                 _this.ZoomControl.OnMouseDown(e);
+                _this.RangeControl.OnMouseDown(e);
             };
             document.onmousemove = function (e) {
                 _this.ZoomControl.OnMouseMove(e);
+                _this.RangeControl.OnMouseMove(e);
             };
             document.onmouseup = function (e) {
                 _this.ZoomControl.OnMouseUp(e);
+                _this.RangeControl.OnMouseUp(e);
             };
         };
         // Resize
