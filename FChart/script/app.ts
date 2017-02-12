@@ -65,6 +65,7 @@ function DemoChart(): void {
     chart.ZoomControl.VerticalAlignment = FChartX.VerticalAlignment.Top;
     //chart.ZoomControl.Layout = FChartX.ZoomControlLayout.Top;
     //chart.ZoomControl.HorizontalAlignment = FChartX.HorizontalAlignment.Left;
+    chart.ShowRangeControl = true;
 
     var serie1 = new FChartX.FChartDataSerie();
     serie1.XAxisID = xaxis1.ID;
