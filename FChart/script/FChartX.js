@@ -1521,6 +1521,30 @@ define(["require", "exports"], function (require, exports) {
         return FChartZoomControl;
     }(ChartGraphObject));
     exports.FChartZoomControl = FChartZoomControl;
+    var RangeControlCornerDock;
+    (function (RangeControlCornerDock) {
+        RangeControlCornerDock[RangeControlCornerDock["LeftTop"] = 0] = "LeftTop";
+        RangeControlCornerDock[RangeControlCornerDock["RightTop"] = 1] = "RightTop";
+        RangeControlCornerDock[RangeControlCornerDock["RightBottom"] = 2] = "RightBottom";
+        RangeControlCornerDock[RangeControlCornerDock["LeftBottom"] = 3] = "LeftBottom";
+    })(RangeControlCornerDock || (RangeControlCornerDock = {}));
+    var RangeControlBarDock;
+    (function (RangeControlBarDock) {
+        RangeControlBarDock[RangeControlBarDock["Left"] = 0] = "Left";
+        RangeControlBarDock[RangeControlBarDock["Right"] = 1] = "Right";
+        RangeControlBarDock[RangeControlBarDock["Top"] = 2] = "Top";
+        RangeControlBarDock[RangeControlBarDock["Bottom"] = 3] = "Bottom";
+    })(RangeControlBarDock || (RangeControlBarDock = {}));
+    var RangeControlDraggerDock;
+    (function (RangeControlDraggerDock) {
+        RangeControlDraggerDock[RangeControlDraggerDock["Left"] = 0] = "Left";
+        RangeControlDraggerDock[RangeControlDraggerDock["Right"] = 1] = "Right";
+    })(RangeControlDraggerDock || (RangeControlDraggerDock = {}));
+    var RangeControlMaskDock;
+    (function (RangeControlMaskDock) {
+        RangeControlMaskDock[RangeControlMaskDock["Left"] = 0] = "Left";
+        RangeControlMaskDock[RangeControlMaskDock["Right"] = 1] = "Right";
+    })(RangeControlMaskDock || (RangeControlMaskDock = {}));
     var FChartRangeControl = (function (_super) {
         __extends(FChartRangeControl, _super);
         function FChartRangeControl() {
@@ -1530,6 +1554,12 @@ define(["require", "exports"], function (require, exports) {
             this.BottomHorizontalBarPosition = new FloatPoint(0, 0);
             this.LeftVerticalBarPosition = new FloatPoint(0, 0);
             this.RightVerticalBarPosition = new FloatPoint(0, 0);
+            this.LeftMask = null;
+            this.RightMask = null;
+            this.LeftBar = null;
+            this.RightBar = null;
+            this.TopBar = null;
+            this.BottomBar = null;
             this.DEFAULT_HORIZONTAL_BAR_SIZE = 20;
             this.DEFAULT_VERTICAL_BAR_SIZE = 20;
             this.m_dHorizontalBarSize = this.DEFAULT_HORIZONTAL_BAR_SIZE;
@@ -1556,7 +1586,7 @@ define(["require", "exports"], function (require, exports) {
         Object.defineProperty(FChartRangeControl.prototype, "HorizontalBarWidth", {
             get: function () {
                 var w = 0;
-                w = this.RightVerticalBarPosition.X + this.VerticalBarWidth - this.LeftVerticalBarPosition.X;
+                w = this.RightVerticalBarPosition.X + this.VerticalBarWidth - this.LeftVerticalBarPosition.X - this.VerticalBarWidth * 2;
                 return w;
             },
             enumerable: true,
@@ -1579,7 +1609,7 @@ define(["require", "exports"], function (require, exports) {
         Object.defineProperty(FChartRangeControl.prototype, "VerticalBarHeight", {
             get: function () {
                 var h = 0;
-                h = this.BottomHorizontalBarPosition.Y + this.HorizontalBarHeight - this.TopHorizontalBarPosition.Y;
+                h = this.BottomHorizontalBarPosition.Y + this.HorizontalBarHeight - this.TopHorizontalBarPosition.Y - this.HorizontalBarHeight * 2;
                 return h;
             },
             enumerable: true,
@@ -1590,112 +1620,140 @@ define(["require", "exports"], function (require, exports) {
                 return;
             }
             this.AttachedChart = chart;
-            var svgRangeControl = chart.GetSVGSVGElementByID("svg-rangecontrol");
-            var wr = this.VerticalBarSize / 2;
-            var hr = this.HorizontalBarSize / 2;
-            var rx = wr;
-            var ry = hr;
+            this.m_dHorizontalBarSize = this.DEFAULT_HORIZONTAL_BAR_SIZE;
+            this.m_dVerticalBarSize = this.DEFAULT_VERTICAL_BAR_SIZE;
+            this.DrawCorner();
+            this.DrawBar();
+            this.DrawDragger();
+            this.DrawMask();
+        };
+        FChartRangeControl.prototype.DrawCorner = function () {
+            var lx = 0;
+            var ly = 0;
+            lx = this.TopHorizontalBarPosition.X;
+            ly = this.TopHorizontalBarPosition.Y;
+            this.DrawCornerGraph("svg-rangecontrol-corner-lefttop", lx, ly, RangeControlCornerDock.LeftTop);
+            lx = this.RightVerticalBarPosition.X;
+            ly = this.RightVerticalBarPosition.Y;
+            this.DrawCornerGraph("svg-rangecontrol-corner-righttop", lx, ly, RangeControlCornerDock.RightTop);
+            lx = this.RightVerticalBarPosition.X;
+            ly = this.BottomHorizontalBarPosition.Y;
+            this.DrawCornerGraph("svg-rangecontrol-corner-rightbottom", lx, ly, RangeControlCornerDock.RightBottom);
+            lx = this.BottomHorizontalBarPosition.X;
+            ly = this.BottomHorizontalBarPosition.Y;
+            this.DrawCornerGraph("svg-rangecontrol-corner-leftbottom", lx, ly, RangeControlCornerDock.LeftBottom);
+        };
+        FChartRangeControl.prototype.DrawCornerGraph = function (id, x, y, dock) {
+            var w = this.VerticalBarWidth;
+            var h = this.HorizontalBarHeight;
+            var rx = w;
+            var ry = h;
             var largeArc = 0;
             var xAxisRotation = 0;
             var sweep = 1;
-            // LeftTop corner arc.
+            var svgArc = this.AttachedChart.CreateSVG(id, "absolute", x.toString(), y.toString(), w.toString(), h.toString());
+            this.AttachedChart.AppendSVGToContainer(svgArc);
+            var fillColor = "lightgray";
+            var x1 = (dock == RangeControlCornerDock.LeftTop || dock == RangeControlCornerDock.RightTop) ? 0 : w;
+            var y1 = (dock == RangeControlCornerDock.LeftTop || dock == RangeControlCornerDock.LeftBottom) ? h : 0;
+            var x2 = (dock == RangeControlCornerDock.LeftTop || dock == RangeControlCornerDock.RightTop) ? w : 0;
+            var y2 = (dock == RangeControlCornerDock.LeftTop || dock == RangeControlCornerDock.LeftBottom) ? 0 : h;
+            var ox = (dock == RangeControlCornerDock.LeftTop || dock == RangeControlCornerDock.LeftBottom) ? w : 0;
+            var oy = (dock == RangeControlCornerDock.LeftTop || dock == RangeControlCornerDock.RightTop) ? h : 0;
+            var arc = this.AttachedChart.CreateArc(x1, y1, x2, y2, rx, ry, xAxisRotation, largeArc, sweep, ox, oy, this.LineWidth, fillColor, true, fillColor);
+            arc.setAttribute("id", id + "-arc");
+            svgArc.appendChild(arc);
+            if (dock == RangeControlCornerDock.LeftBottom) {
+                var i = 0;
+            }
+        };
+        FChartRangeControl.prototype.DrawBar = function () {
+            this.DrawBarGraph("svg-rangecontrol-bar-left", RangeControlBarDock.Left);
+            this.DrawBarGraph("svg-rangecontrol-bar-right", RangeControlBarDock.Right);
+            this.DrawBarGraph("svg-rangecontrol-bar-top", RangeControlBarDock.Top);
+            this.DrawBarGraph("svg-rangecontrol-bar-bottom", RangeControlBarDock.Bottom);
+        };
+        FChartRangeControl.prototype.DrawBarGraph = function (id, dock) {
             var lx = 0;
             var ly = 0;
             var w = 0;
             var h = 0;
-            lx = this.TopHorizontalBarPosition.X;
-            ly = this.TopHorizontalBarPosition.Y;
-            w = this.VerticalBarWidth;
-            h = this.HorizontalBarHeight;
-            var svgArc1 = chart.CreateSVG("svg-rangecontrol-arc-lefttop", "absolute", lx.toString(), ly.toString(), w.toString(), h.toString());
-            chart.Container.appendChild(svgArc1);
-            var x1 = w;
-            var y1 = 0;
-            var x2 = 0;
-            var y2 = h;
-            sweep = 0;
-            var arc1 = chart.CreateArc(x1, y1, x2, y2, rx, ry, xAxisRotation, largeArc, sweep);
-            arc1.setAttribute("id", "rangecontrol-arc-lefttop");
-            arc1.setAttribute("stroke-width", this.LineWidth.toString());
-            arc1.setAttribute("stroke", this.LineColor);
-            svgArc1.appendChild(arc1);
-            // RightTop corner arc.
-            lx = this.RightVerticalBarPosition.X;
-            ly = this.RightVerticalBarPosition.Y;
-            var svgArc2 = chart.CreateSVG("svg-rangecontrol-arc-righttop", "absolute", lx.toString(), ly.toString(), w.toString(), h.toString());
-            chart.Container.appendChild(svgArc2);
-            x1 = 0;
-            y1 = 0;
-            x2 = w;
-            y2 = h;
-            sweep = 1;
-            var arc2 = chart.CreateArc(x1, y1, x2, y2, rx, ry, xAxisRotation, largeArc, sweep);
-            arc2.setAttribute("id", "rangecontrol-arc-righttop");
-            arc2.setAttribute("stroke-width", this.LineWidth.toString());
-            arc2.setAttribute("stroke", this.LineColor);
-            svgArc2.appendChild(arc2);
-            // RightBottom corner arc.
-            lx = this.RightVerticalBarPosition.X;
-            ly = this.BottomHorizontalBarPosition.Y;
-            var svgArc3 = chart.CreateSVG("svg-rangecontrol-arc-rightbottom", "absolute", lx.toString(), ly.toString(), w.toString(), h.toString());
-            chart.Container.appendChild(svgArc3);
-            x1 = w;
-            y1 = 0;
-            x2 = 0;
-            y2 = h;
-            sweep = 1;
-            var arc3 = chart.CreateArc(x1, y1, x2, y2, rx, ry, xAxisRotation, largeArc, sweep);
-            arc3.setAttribute("id", "rangecontrol-arc-rightbottom");
-            arc3.setAttribute("stroke-width", this.LineWidth.toString());
-            arc3.setAttribute("stroke", this.LineColor);
-            svgArc3.appendChild(arc3);
-            // LeftBottom corner arc.
-            lx = this.BottomHorizontalBarPosition.X;
-            ly = this.BottomHorizontalBarPosition.Y;
-            var svgArc4 = chart.CreateSVG("svg-rangecontrol-arc-leftbottom", "absolute", lx.toString(), ly.toString(), w.toString(), h.toString());
-            chart.Container.appendChild(svgArc4);
-            x1 = w;
-            y1 = h;
-            x2 = 0;
-            y2 = 0;
-            sweep = 1;
-            var arc4 = chart.CreateArc(x1, y1, x2, y2, rx, ry, xAxisRotation, largeArc, sweep);
-            arc4.setAttribute("id", "rangecontrol-arc-leftbottom");
-            arc4.setAttribute("stroke-width", this.LineWidth.toString());
-            arc4.setAttribute("stroke", this.LineColor);
-            svgArc4.appendChild(arc4);
-            // Left bar
-            lx = this.TopHorizontalBarPosition.X;
-            ly = this.TopHorizontalBarPosition.Y + this.HorizontalBarHeight;
-            w = this.VerticalBarWidth;
-            h = this.VerticalBarHeight - this.HorizontalBarHeight * 2;
-            var svgLeftBar = chart.CreateSVG("svg-rangecontrol-bar-left", "absolute", lx.toString(), ly.toString(), w.toString(), h.toString());
-            chart.Container.appendChild(svgLeftBar);
-            svgLeftBar.style.setProperty("background-color", "green");
-            // Right bar
-            lx = this.RightVerticalBarPosition.X;
-            ly = this.TopHorizontalBarPosition.Y + this.HorizontalBarHeight;
-            w = this.VerticalBarWidth;
-            h = this.VerticalBarHeight - this.HorizontalBarHeight * 2;
-            var svgRightBar = chart.CreateSVG("svg-rangecontrol-bar-right", "absolute", lx.toString(), ly.toString(), w.toString(), h.toString());
-            chart.Container.appendChild(svgRightBar);
-            svgRightBar.style.setProperty("background-color", "green");
-            // Top bar
-            lx = this.TopHorizontalBarPosition.X + this.VerticalBarWidth;
-            ly = this.TopHorizontalBarPosition.Y;
-            w = this.HorizontalBarWidth - this.VerticalBarWidth * 2;
-            h = this.HorizontalBarHeight;
-            var svgTopBar = chart.CreateSVG("svg-rangecontrol-bar-top", "absolute", lx.toString(), ly.toString(), w.toString(), h.toString());
-            chart.Container.appendChild(svgTopBar);
-            svgTopBar.style.setProperty("background-color", "green");
-            // Bottom bar
-            lx = this.TopHorizontalBarPosition.X + this.VerticalBarWidth;
-            ly = this.BottomHorizontalBarPosition.Y;
-            w = this.HorizontalBarWidth - this.VerticalBarWidth * 2;
-            h = this.HorizontalBarHeight;
-            var svgBottomBar = chart.CreateSVG("svg-rangecontrol-bar-bottom", "absolute", lx.toString(), ly.toString(), w.toString(), h.toString());
-            chart.Container.appendChild(svgBottomBar);
-            svgBottomBar.style.setProperty("background-color", "green");
+            lx = (dock == RangeControlBarDock.Top || dock == RangeControlBarDock.Bottom) ? (this.TopHorizontalBarPosition.X + this.VerticalBarWidth) : 0;
+            if (dock == RangeControlBarDock.Left) {
+                lx = this.TopHorizontalBarPosition.X;
+            }
+            else if (dock == RangeControlBarDock.Right) {
+                lx = this.RightVerticalBarPosition.X;
+            }
+            ly = (dock == RangeControlBarDock.Left || dock == RangeControlBarDock.Right) ? (this.TopHorizontalBarPosition.Y + this.HorizontalBarHeight) : 0;
+            if (dock == RangeControlBarDock.Top) {
+                ly = this.TopHorizontalBarPosition.Y;
+            }
+            else if (dock == RangeControlBarDock.Bottom) {
+                ly = this.BottomHorizontalBarPosition.Y;
+            }
+            w = (dock == RangeControlBarDock.Left || dock == RangeControlBarDock.Right) ? this.VerticalBarWidth : this.HorizontalBarWidth;
+            h = (dock == RangeControlBarDock.Left || dock == RangeControlBarDock.Right) ? this.VerticalBarHeight : this.HorizontalBarHeight;
+            var svgBar = this.AttachedChart.CreateSVG(id, "absolute", lx.toString(), ly.toString(), w.toString(), h.toString());
+            this.AttachedChart.AppendSVGToContainer(svgBar);
+            svgBar.style.setProperty("background-color", "lightgray");
+            this.LeftBar = dock == RangeControlBarDock.Left ? svgBar : this.LeftBar;
+            this.RightBar = dock == RangeControlBarDock.Right ? svgBar : this.RightBar;
+            this.TopBar = dock == RangeControlBarDock.Top ? svgBar : this.TopBar;
+            this.BottomBar = dock == RangeControlBarDock.Bottom ? svgBar : this.BottomBar;
+        };
+        FChartRangeControl.prototype.DrawDragger = function () {
+            this.DrawDraggerGraph("rangecontrol-dragger-left", RangeControlDraggerDock.Left);
+            this.DrawDraggerGraph("rangecontrol-dragger-right", RangeControlDraggerDock.Right);
+        };
+        FChartRangeControl.prototype.DrawDraggerGraph = function (id, dock) {
+            var tenthOfW = this.VerticalBarWidth / 10;
+            var dLineWidth = tenthOfW * 2;
+            var h = this.VerticalBarHeight;
+            var dh = h / 2;
+            var dx1 = tenthOfW * 2 + dLineWidth / 2;
+            var dy1 = h / 2 - dh / 2;
+            var dx2 = dx1;
+            var dy2 = h / 2 + dh / 2;
+            var svgBar = dock == RangeControlDraggerDock.Left ? this.LeftBar : this.RightBar;
+            var line1 = this.AttachedChart.CreateSVGLineElement();
+            FChartHelper.SetSVGLineAttributes(line1, id + "-line1", dx1.toString(), dy1.toString(), dx2.toString(), dy2.toString(), dLineWidth.toString(), "black");
+            svgBar.appendChild(line1);
+            var dx3 = dx1 + tenthOfW * 4;
+            var dy3 = dy1;
+            var dx4 = dx3;
+            var dy4 = dy2;
+            var line2 = this.AttachedChart.CreateSVGLineElement();
+            FChartHelper.SetSVGLineAttributes(line2, id + "-line2", dx3.toString(), dy3.toString(), dx4.toString(), dy4.toString(), dLineWidth.toString(), "black");
+            svgBar.appendChild(line2);
+            dx3 += tenthOfW * 2;
+            dx4 = dx1;
+            var dd = "M " + dx1 + " " + dy1 + " " +
+                "L " + dx2 + " " + dy2 + " " +
+                "L " + dx4 + " " + dy4 + " " +
+                "L " + dx3 + " " + dy3 + " " +
+                "L " + dx1 + " " + dy1 + " " + "Z";
+            var dragger = this.AttachedChart.CreateSVGPathElement();
+            dragger.setAttribute("id", id);
+            dragger.setAttribute("d", dd);
+            dragger.setAttribute("fill", "transparent");
+            svgBar.appendChild(dragger);
+        };
+        FChartRangeControl.prototype.DrawMask = function () {
+            var x = 0;
+            var y = 0;
+            var w = 0;
+            var h = 0;
+            this.DrawMaskGraph("svg-rangecontrol-mask-left", x, y, w, h, RangeControlMaskDock.Left);
+            this.DrawMaskGraph("svg-rangecontrol-mask-right", x, y, w, h, RangeControlMaskDock.Right);
+        };
+        FChartRangeControl.prototype.DrawMaskGraph = function (id, x, y, w, h, dock) {
+            var mask = this.AttachedChart.CreateSVG(id, "absolute", x.toString(), y.toString(), w.toString(), h.toString());
+            mask.style.setProperty("background-color", "whitesmoke");
+            mask.style.setProperty("opacity", "0.5");
+            this.AttachedChart.AppendSVGToContainer(mask);
+            this.LeftMask = dock == RangeControlMaskDock.Left ? mask : this.LeftMask;
+            this.RightMask = dock == RangeControlMaskDock.Right ? mask : this.RightMask;
         };
         return FChartRangeControl;
     }(ChartGraphObject));
@@ -3489,6 +3547,13 @@ define(["require", "exports"], function (require, exports) {
                 }
             }
         };
+        FChart.prototype.AppendSVGToContainer = function (svg) {
+            if (FChartHelper.ObjectIsNullOrEmpty(svg)) {
+                return;
+            }
+            this.m_arrSVG.push(svg);
+            this.Container.appendChild(svg);
+        };
         FChart.prototype.CreateSVG = function (id, position, left, top, width, height) {
             var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
             svg.setAttribute("id", id);
@@ -3774,15 +3839,24 @@ define(["require", "exports"], function (require, exports) {
             var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
             return rect;
         };
-        FChart.prototype.CreateArc = function (x1, y1, x2, y2, rx, ry, xaxisrotation, largeArc, sweep, fill) {
+        FChart.prototype.CreateArc = function (x1, y1, x2, y2, rx, ry, xaxisrotation, largeArc, sweep, ox, oy, strokeWidth, strokeColor, fill, fillColor) {
+            if (strokeWidth === void 0) { strokeWidth = 1; }
+            if (strokeColor === void 0) { strokeColor = "black"; }
             if (fill === void 0) { fill = false; }
+            if (fillColor === void 0) { fillColor = "black"; }
             var svgArc = this.CreateSVGPathElement();
             var d = "";
-            d = "M " + x1 + " " + y1 + " A " + rx + " " + ry + " " + xaxisrotation + " " + largeArc + " " + sweep + " " + x2 + " " + y2;
+            var line = "L " + ox.toString() + " " + oy.toString() + " " + "L " + x1.toString() + " " + y1.toString() + " Z";
+            d = "M " + x1 + " " + y1 + " A " + rx + " " + ry + " " + xaxisrotation + " " + largeArc + " " + sweep + " " + x2 + " " + y2 + " " + line;
             svgArc.setAttribute("d", d);
             if (!fill) {
                 svgArc.setAttribute("fill", "none");
             }
+            else {
+                svgArc.setAttribute("fill", fillColor);
+            }
+            svgArc.setAttribute("stroke-width", strokeWidth.toString());
+            svgArc.setAttribute("stroke", strokeColor);
             return svgArc;
         };
         return FChart;
