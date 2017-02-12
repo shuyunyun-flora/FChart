@@ -1871,8 +1871,6 @@ define(["require", "exports"], function (require, exports) {
             this.ZoomControl = new FChartZoomControl();
             this.MaxZoomLevel = 5;
             this.ZoomLevel = 1;
-            this.XAxisLeftMargin = 10;
-            this.XAxisRightMargin = 50;
             this.XAxes = new Array();
             this.YAxes = new Array();
             this.AspectRatio = 1.0;
@@ -1900,6 +1898,10 @@ define(["require", "exports"], function (require, exports) {
             this.MaxXAxisHeight = 100;
             this.YAxisDefaultWidth = 80;
             this.XAxisDefaultHeight = 80;
+            this.DEFAULT_XAXIS_LEFT_MARGIN = 20;
+            this.DEFAULT_XAXIS_RIGHT_MARGIN = 20;
+            this.m_dXAxisLeftMargin = this.DEFAULT_XAXIS_LEFT_MARGIN;
+            this.m_dXAxisRightMargin = this.DEFAULT_XAXIS_RIGHT_MARGIN;
             this.SortedDataSeries = false;
             this.ShowScrollBar = false;
             this.GridX = new FChartGrid();
@@ -1918,6 +1920,32 @@ define(["require", "exports"], function (require, exports) {
             this.IsWindowZooming = false;
             this.WindowDevicePixelRatio = 0;
         }
+        Object.defineProperty(FChart.prototype, "XAxisLeftMargin", {
+            get: function () {
+                this.m_dXAxisLeftMargin = Math.abs(this.m_dXAxisLeftMargin);
+                var max = this.PlotWidth * 0.1;
+                this.m_dXAxisLeftMargin = this.m_dXAxisLeftMargin > max ? max : this.m_dXAxisLeftMargin;
+                return this.m_dXAxisLeftMargin;
+            },
+            set: function (value) {
+                this.m_dXAxisLeftMargin = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(FChart.prototype, "XAxisRightMargin", {
+            get: function () {
+                this.m_dXAxisRightMargin = Math.abs(this.m_dXAxisRightMargin);
+                var max = this.PlotWidth * 0.1;
+                this.m_dXAxisRightMargin = this.m_dXAxisRightMargin > max ? max : this.m_dXAxisRightMargin;
+                return this.m_dXAxisRightMargin;
+            },
+            set: function (value) {
+                this.m_dXAxisRightMargin = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
         Object.defineProperty(FChart.prototype, "MarginLeft", {
             get: function () {
                 return this.m_leftMargin;
@@ -3389,6 +3417,10 @@ define(["require", "exports"], function (require, exports) {
             this.SVGMeasure.style.setProperty("top", "0px");
             divContainer.appendChild(this.SVGMeasure);
         };
+        FChart.prototype.ResetVariablesDefaultValue = function () {
+            this.m_dXAxisLeftMargin = this.DEFAULT_XAXIS_LEFT_MARGIN;
+            this.m_dXAxisRightMargin = this.DEFAULT_XAXIS_RIGHT_MARGIN;
+        };
         FChart.prototype.SetCoordinate = function () {
             var _this = this;
             var divContainer = document.getElementById(this.BindTo);
@@ -3399,6 +3431,7 @@ define(["require", "exports"], function (require, exports) {
                 divContainer.removeChild(this.m_arrSVG[i]);
             }
             this.m_arrSVG = [];
+            this.ResetVariablesDefaultValue();
             this.CalculateChartSize();
             this.CalculatePartsSize();
             this.CalculatePartsPosition();

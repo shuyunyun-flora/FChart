@@ -2046,8 +2046,6 @@
         public MaxZoomLevel: number = 5;
         public ZoomLevel: number = 1;
 
-        public XAxisLeftMargin: number = 10;
-        public XAxisRightMargin: number = 50;
         public XAxes: FChartXAxis[] = new Array<FChartXAxis>();
         public YAxes: FChartYAxis[] = new Array<FChartYAxis>();
         public AspectRatio: number = 1.0;
@@ -2082,6 +2080,28 @@
 
         private YAxisDefaultWidth: number = 80;
         private XAxisDefaultHeight: number = 80;
+        private DEFAULT_XAXIS_LEFT_MARGIN: number = 20;
+        private DEFAULT_XAXIS_RIGHT_MARGIN: number = 20;
+        private m_dXAxisLeftMargin: number = this.DEFAULT_XAXIS_LEFT_MARGIN;
+        private m_dXAxisRightMargin: number = this.DEFAULT_XAXIS_RIGHT_MARGIN;
+        public get XAxisLeftMargin(): number {
+            this.m_dXAxisLeftMargin = Math.abs(this.m_dXAxisLeftMargin);
+            let max: number = this.PlotWidth * 0.1;
+            this.m_dXAxisLeftMargin = this.m_dXAxisLeftMargin > max ? max : this.m_dXAxisLeftMargin;
+            return this.m_dXAxisLeftMargin;
+        }
+        public set XAxisLeftMargin(value: number) {
+            this.m_dXAxisLeftMargin = value;
+        }
+        public get XAxisRightMargin(): number {
+            this.m_dXAxisRightMargin = Math.abs(this.m_dXAxisRightMargin);
+            let max: number = this.PlotWidth * 0.1;
+            this.m_dXAxisRightMargin = this.m_dXAxisRightMargin > max ? max : this.m_dXAxisRightMargin;
+            return this.m_dXAxisRightMargin;
+        }
+        public set XAxisRightMargin(value: number) {
+            this.m_dXAxisRightMargin = value;
+        }
 
         private SortedDataSeries: boolean = false;
 
@@ -3797,6 +3817,11 @@
             divContainer.appendChild(this.SVGMeasure);
         }
 
+        private ResetVariablesDefaultValue() {
+            this.m_dXAxisLeftMargin = this.DEFAULT_XAXIS_LEFT_MARGIN;
+            this.m_dXAxisRightMargin = this.DEFAULT_XAXIS_RIGHT_MARGIN;
+        }
+
         private SetCoordinate() {
             let divContainer = document.getElementById(this.BindTo);
             if (FChartHelper.ObjectIsNullOrEmpty(divContainer)) {
@@ -3806,6 +3831,8 @@
                 divContainer.removeChild(this.m_arrSVG[i]);
             }
             this.m_arrSVG = [];
+
+            this.ResetVariablesDefaultValue();
 
             this.CalculateChartSize();
             this.CalculatePartsSize();
