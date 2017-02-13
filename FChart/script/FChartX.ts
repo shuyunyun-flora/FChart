@@ -1203,8 +1203,7 @@
         private ZoomOutHolder: SVGCircleElement = null;
         private DraggerHolder: SVGPathElement = null;
         private LabelHolder: SVGTextElement = null;
-        private ProgressBarHolder: SVGPathElement = null;
-
+        private ProgressBarHolder: SVGLineElement = null;
         private ZoomInHolderID: string = "zoomcontrol-zoomin-holder";
         private ZoomOutHolderID: string = "zoomcontrol-zoomout-holder";
         private DraggerHolderID: string = "zoomcontrol-dragger-holder";
@@ -1216,6 +1215,7 @@
         private CircleRadius: number = 0;
         private DraggerX: number = 0;
         private DraggerY: number = 0;
+        private Length: number = 0;
 
         public CalculateShortSize(availableSpace: number): void {
             if (availableSpace > this.DefaultShortSize) {
@@ -1256,6 +1256,7 @@
                 let r: number = Math.min(eighthOfH / 2, twothOfW / 2);
                 this.CircleRadius = r;
                 let hb: number = h - 4 * r;
+                this.Length = hb;
                 let cx1: number = mx + r;
                 let cy1: number = my + 2 * r - r;
                 let circle1: SVGCircleElement = chart.CreateSVGCircleElement();
@@ -1301,9 +1302,10 @@
                 let ly1: number = my + 2 * r;
                 let lx2: number = cx1;
                 let ly2: number = my + 2 * r + hb;
-                let lineBody: SVGLineElement = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(lineBody, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(lineBody);
+                let progressBar: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(progressBar, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(progressBar);
+                this.ProgressBarHolder = progressBar;
 
                 let scale: number = hb / chart.MaxZoomLevel;
                 let exponent: number = 0;
@@ -1351,6 +1353,7 @@
                 let transform: string = "rotate(270," + tx.toString() + "," + ty.toString() + ")";
                 FChartHelper.SetSVGTextAttributes(text, this.LabelHolderID, tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor, transform);
                 svgZoomControl.appendChild(text);
+                this.LabelHolder = text;
             }
             else {
                 let w: number = this.LongSize;
@@ -1366,6 +1369,7 @@
                 let r: number = Math.min(eighthOfW / 2, twothOfH / 2);
                 this.CircleRadius = r;
                 let wb: number = w - 4 * r;
+                this.Length = wb;
                 let cx1: number = mx + r;
                 let cy1: number = my + twothOfH + r;
                 let circle1: SVGCircleElement = chart.CreateSVGCircleElement();
@@ -1413,9 +1417,10 @@
                 let ly1: number = my + twothOfH + r;
                 let lx2: number = lx1 + wb;
                 let ly2: number = ly1;
-                let lineBody: SVGLineElement = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(lineBody, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(lineBody);
+                let progressBar: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(progressBar, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(progressBar);
+                this.ProgressBarHolder = progressBar;
 
                 let scale: number = wb / chart.MaxZoomLevel;
                 let exponent: number = 0;
@@ -1462,6 +1467,7 @@
                 let text: SVGTextElement = chart.CreateSVGTextElement();
                 FChartHelper.SetSVGTextAttributes(text, this.LabelHolderID, tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor);
                 svgZoomControl.appendChild(text);
+                this.LabelHolder = text;
             }
         }
 
@@ -1485,6 +1491,21 @@
         private DraggingStartPosition: number = 0;
         private DragThreshold: number = 5;
         private Dragging: boolean = false;
+
+        private get ZoomValue(): number {
+            let zoomValue: number = 0;
+            let length: number = 0;
+            if (this.Orientation == Orientation.Horizontal) {
+                length = this.ProgressBarHolder.x2.baseVal.value - this.ProgressBarHolder.x1.baseVal.value;
+                zoomValue = (this.DraggerX - this.ProgressBarHolder.x1.baseVal.value - this.DraggerScale) / length * this.AttachedChart.MaxZoomLevel;
+            }
+            else {
+                length = this.ProgressBarHolder.y2.baseVal.value - this.ProgressBarHolder.y1.baseVal.value;
+                zoomValue = (length - (this.DraggerY - this.ProgressBarHolder.y1.baseVal.value - this.DraggerScale)) / length * this.AttachedChart.MaxZoomLevel;
+            }
+
+            return zoomValue;
+        }
 
         public OnMouseDown(e: MouseEvent): void {
             if (FChartHelper.ObjectIsNullOrEmpty(e) || FChartHelper.ObjectIsNullOrEmpty(e.toElement)) {
@@ -1534,6 +1555,7 @@
 
         private ProcessDragging(e: MouseEvent) {
             let delta: number = 0;
+
             if (this.Orientation == Orientation.Horizontal) {
                 delta = e.clientX - this.DraggingStartPosition;
                 let left: number = 0;
@@ -1550,7 +1572,6 @@
                 if (delta == 0) {
                     return;
                 }
-                let zoomChange: number = 0;
                 if (delta < 0) {
                     if (left == 0) {
                         return;
@@ -1558,7 +1579,6 @@
                     delta = Math.abs(delta);
                     delta = delta > left ? left : delta;
                     this.DraggerX -= delta;
-                    zoomChange = -delta / this.DraggerBigScale;
                 }
                 else {
                     if (right == 0) {
@@ -1566,7 +1586,6 @@
                     }
                     delta = delta > right ? right : delta;
                     this.DraggerX += delta;
-                    zoomChange = delta / this.DraggerBigScale;
                 }
 
                 let bx1: number = this.DraggerX - this.DraggerScale;
@@ -1596,14 +1615,12 @@
                 if (delta == 0) {
                     return;
                 }
-                let zoomChange: number = 0;
                 if (delta > 0) {
                     if (bottom == 0) {
                         return;
                     }
                     delta = delta > bottom ? bottom : delta;
                     this.DraggerY += delta;
-                    zoomChange = -delta / this.DraggerBigScale;
                 }
                 else {
                     if (top == 0) {
@@ -1612,7 +1629,6 @@
                     delta = Math.abs(delta);
                     delta = delta > top ? top : delta;
                     this.DraggerY -= delta;
-                    zoomChange = delta / this.DraggerBigScale;
                 }
 
                 let bx1: number = this.DraggerX - this.CircleRadius;
@@ -1636,6 +1652,14 @@
             else {
                 this.DraggingStartPosition = e.clientY;
             }
+
+            this.AttachedChart.ZoomToScale(1 / this.ZoomValue);
+            let dValue: number = FChartHelper.RoundFloatNumber(this.ZoomValue, 3, false);
+            let strValue: string = dValue.toString();
+            if (dValue.toString().length > 6) {
+                strValue = dValue.toFixed(3);
+            }
+            this.LabelHolder.textContent = strValue;
         }
     }
 
@@ -2241,7 +2265,7 @@
             return false;
         }
 
-        public static RoundFloatNumber(dValue: number, maxFloatDigits: number): number {
+        public static RoundFloatNumber(dValue: number, maxFloatDigits: number, intergerMajor: boolean = true): number {
             let dResult: number = 0;
 
             if (dValue == 0) {
@@ -2273,7 +2297,7 @@
                 return dResult;
             }
 
-            if (intValue != 0) {
+            if (intValue != 0 && intergerMajor) {
                 if (floatValue <= 0.5) {
                     floatValue = 0.5;
                 }
@@ -2297,19 +2321,19 @@
                     floatValue = 0;
                 }
                 else if (n < maxFloatDigits) {
-                    dResult = parseInt(strInteger) + parseFloat("0." + strFloat);
+                    floatValue = parseFloat("0." + strFloat);
                 }
                 else {
-                    strFloat = strFloat.substr(n);
+                    strFloat = strFloat.substr(0, maxFloatDigits);
                     let v1: number = 1;
                     for (let i = 0; i < maxFloatDigits; i++) {
                         v1 *= 10;
                     }
                     let floatTemp: number = parseFloat("0." + strFloat);
-                    floatValue = Math.round(floatTemp * v1) / v1;
+                    floatValue = Math.round(floatTemp * v1 + 0.5) / v1;
                 }
 
-                dResult = floatValue;
+                dResult = intValue + floatValue;
             }
 
             return dResult;
@@ -2481,7 +2505,7 @@
         public Legend: FChartLegend = new FChartLegend();
         public Zoom: number = 1.0;
         public ZoomMode: ChartZoomMode = ChartZoomMode.Center;
-        public Zoomable: boolean = false;
+        public ShowZoomControl: boolean = false;
         public ZoomControl: FChartZoomControl = new FChartZoomControl();
         public ShowRangeControl: boolean = false;
         private RangeControl: FChartRangeControl = new FChartRangeControl();
@@ -2553,7 +2577,9 @@
             this.SCALE_ULIMIT = 1 / value;
         }
 
-        public ZoomLevel: number = 1;
+        public get ZoomLevel(): number {
+            return 1 / this.m_scale;
+        }
 
         private SortedDataSeries: boolean = false;
 
@@ -2724,10 +2750,10 @@
                 let zoomFactor: number = dNewScale / this.m_oldscale;
                 let scale = 0.5 * (zoomFactor - 1);
                 this.m_xl -= (this.m_xr - this.m_xl) * scale;
-                this.m_yt += (this.m_xr - this.m_xl) * scale;
+                this.m_yt += (this.m_yt - this.m_yb) * scale;
             }
             else {                                      // Zoom In
-                let zoomFactor: number = dNewScale / this.m_oldscale;
+                let zoomFactor: number = this.m_oldscale / dNewScale;
                 let scale = 0.5 - 0.5 / zoomFactor;
                 this.m_xl += (this.m_xr - this.m_xl) * scale;
                 this.m_yt -= (this.m_yt - this.m_yb) * scale;
@@ -3084,7 +3110,7 @@
         }
 
         private DrawZoomControl(): void {
-            if (this.Zoomable) {
+            if (this.ShowZoomControl) {
                 this.ZoomControl.Draw(this);
             }
         }
@@ -3548,7 +3574,7 @@
                 }
 
                 let availableSpace: number = this.ChartHeight - xAxesHeight;
-                if (this.Zoomable && availableSpace > 0) {
+                if (this.ShowZoomControl && availableSpace > 0) {
                     if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                         let hz: number = availableSpace * 0.2;
                         this.ZoomControl.CalculateShortSize(hz);
@@ -3561,7 +3587,7 @@
                 let maxHeight: number = 0;
                 if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
                     maxHeight = h * 0.3;
-                    if (this.Zoomable) {
+                    if (this.ShowZoomControl) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                             let hz: number = h * 0.1;
                             this.ZoomControl.CalculateShortSize(hz);
@@ -3571,7 +3597,7 @@
                 }
                 else {
                     maxHeight = h * 0.5;
-                    if (this.Zoomable) {
+                    if (this.ShowZoomControl) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                             let hz: number = h * 0.1;
                             this.ZoomControl.CalculateShortSize(hz);
@@ -3613,7 +3639,7 @@
                 }
 
                 let availableSpace: number = this.ChartWidth - yAxesWidth;
-                if (this.Zoomable && availableSpace > 0) {
+                if (this.ShowZoomControl && availableSpace > 0) {
                     if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                         let wz: number = availableSpace * 0.2;
                         this.ZoomControl.CalculateShortSize(wz);
@@ -3626,7 +3652,7 @@
                 let maxWidth: number = 0;
                 if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
                     maxWidth = w * 0.3;
-                    if (this.Zoomable) {
+                    if (this.ShowZoomControl) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                             let wz: number = w * 0.1;
                             this.ZoomControl.CalculateShortSize(wz);
@@ -3636,7 +3662,7 @@
                 }
                 else {
                     maxWidth = w * 0.5;
-                    if (this.Zoomable) {
+                    if (this.ShowZoomControl) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                             let wz: number = w * 0.1;
                             this.ZoomControl.CalculateShortSize(wz);
@@ -3709,7 +3735,7 @@
 
             let zoomControlWidth: number = 0;
             let zoomControlHeight: number = 0;
-            if (this.Zoomable) {
+            if (this.ShowZoomControl) {
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                     zoomControlWidth = this.ZoomControl.ShortSize;
                 }
@@ -3773,7 +3799,7 @@
                 }
             }
 
-            if (this.Zoomable) {
+            if (this.ShowZoomControl) {
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                     this.ZoomControl.CalculateLongSize(this.PlotHeight);
                 }
@@ -3823,7 +3849,7 @@
 
             let zoomControlWidth: number = 0;
             let zoomControlHeight: number = 0;
-            if (this.Zoomable) {
+            if (this.ShowZoomControl) {
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                     zoomControlWidth = this.ZoomControl.ShortSize;
                 }
@@ -3835,11 +3861,11 @@
             let rangeControlWidth: number = this.ShowRangeControl ? this.RangeControl.VerticalBarSize : 0;
             let rangeControlHeight: number = this.ShowRangeControl ? this.RangeControl.HorizontalBarSize : 0;
 
-            if (this.Zoomable && this.ZoomControl.Layout == ZoomControlLayout.Left) {
+            if (this.ShowZoomControl && this.ZoomControl.Layout == ZoomControlLayout.Left) {
                 this.ZoomControl.X = xStart;
                 xStart += zoomControlWidth;
             }
-            if (this.Zoomable && this.ZoomControl.Layout == ZoomControlLayout.Top) {
+            if (this.ShowZoomControl && this.ZoomControl.Layout == ZoomControlLayout.Top) {
                 this.ZoomControl.Y = yStart;
                 yStart += zoomControlHeight;
             }
@@ -3942,14 +3968,14 @@
                 }
             }
 
-            if (this.Zoomable && this.ZoomControl.Layout == ZoomControlLayout.Right) {
+            if (this.ShowZoomControl && this.ZoomControl.Layout == ZoomControlLayout.Right) {
                 this.ZoomControl.X = xStart;
             }
-            if (this.Zoomable && this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
+            if (this.ShowZoomControl && this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                 this.ZoomControl.Y = yStart;
             }
 
-            if (this.Zoomable) {
+            if (this.ShowZoomControl) {
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                     if (this.ZoomControl.VerticalAlignment == VerticalAlignment.Top) {
                         this.ZoomControl.Y = this.PlotPosition.Y;
@@ -4282,7 +4308,7 @@
                 this.m_arrSVG.push(svgLegend);
             }
 
-            if (this.Zoomable) {
+            if (this.ShowZoomControl) {
                 let wz: number = 0;
                 let hz: number = 0;
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {

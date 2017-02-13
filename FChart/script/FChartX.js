@@ -1135,6 +1135,7 @@ define(["require", "exports"], function (require, exports) {
             this.CircleRadius = 0;
             this.DraggerX = 0;
             this.DraggerY = 0;
+            this.Length = 0;
             this.ClickingOnDragger = false;
             this.DraggingStartPosition = 0;
             this.DragThreshold = 5;
@@ -1209,6 +1210,7 @@ define(["require", "exports"], function (require, exports) {
                 var r = Math.min(eighthOfH / 2, twothOfW / 2);
                 this.CircleRadius = r;
                 var hb = h - 4 * r;
+                this.Length = hb;
                 var cx1 = mx + r;
                 var cy1 = my + 2 * r - r;
                 var circle1 = chart.CreateSVGCircleElement();
@@ -1250,9 +1252,10 @@ define(["require", "exports"], function (require, exports) {
                 var ly1 = my + 2 * r;
                 var lx2 = cx1;
                 var ly2 = my + 2 * r + hb;
-                var lineBody = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(lineBody, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(lineBody);
+                var progressBar = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(progressBar, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(progressBar);
+                this.ProgressBarHolder = progressBar;
                 var scale = hb / chart.MaxZoomLevel;
                 var exponent = 0;
                 while (scale > this.MaxBarSize / 2) {
@@ -1296,6 +1299,7 @@ define(["require", "exports"], function (require, exports) {
                 var transform = "rotate(270," + tx.toString() + "," + ty.toString() + ")";
                 FChartHelper.SetSVGTextAttributes(text, this.LabelHolderID, tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor, transform);
                 svgZoomControl.appendChild(text);
+                this.LabelHolder = text;
             }
             else {
                 var w = this.LongSize;
@@ -1309,6 +1313,7 @@ define(["require", "exports"], function (require, exports) {
                 var r = Math.min(eighthOfW / 2, twothOfH / 2);
                 this.CircleRadius = r;
                 var wb = w - 4 * r;
+                this.Length = wb;
                 var cx1 = mx + r;
                 var cy1 = my + twothOfH + r;
                 var circle1 = chart.CreateSVGCircleElement();
@@ -1352,9 +1357,10 @@ define(["require", "exports"], function (require, exports) {
                 var ly1 = my + twothOfH + r;
                 var lx2 = lx1 + wb;
                 var ly2 = ly1;
-                var lineBody = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(lineBody, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(lineBody);
+                var progressBar = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(progressBar, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(progressBar);
+                this.ProgressBarHolder = progressBar;
                 var scale = wb / chart.MaxZoomLevel;
                 var exponent = 0;
                 while (scale > this.MaxBarSize / 2) {
@@ -1397,6 +1403,7 @@ define(["require", "exports"], function (require, exports) {
                 var text = chart.CreateSVGTextElement();
                 FChartHelper.SetSVGTextAttributes(text, this.LabelHolderID, tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor);
                 svgZoomControl.appendChild(text);
+                this.LabelHolder = text;
             }
         };
         FChartZoomControl.prototype.OnZoomIn = function (e) {
@@ -1411,6 +1418,23 @@ define(["require", "exports"], function (require, exports) {
             }
             this.AttachedChart.ZoomOut();
         };
+        Object.defineProperty(FChartZoomControl.prototype, "ZoomValue", {
+            get: function () {
+                var zoomValue = 0;
+                var length = 0;
+                if (this.Orientation == Orientation.Horizontal) {
+                    length = this.ProgressBarHolder.x2.baseVal.value - this.ProgressBarHolder.x1.baseVal.value;
+                    zoomValue = (this.DraggerX - this.ProgressBarHolder.x1.baseVal.value - this.DraggerScale) / length * this.AttachedChart.MaxZoomLevel;
+                }
+                else {
+                    length = this.ProgressBarHolder.y2.baseVal.value - this.ProgressBarHolder.y1.baseVal.value;
+                    zoomValue = (length - (this.DraggerY - this.ProgressBarHolder.y1.baseVal.value - this.DraggerScale)) / length * this.AttachedChart.MaxZoomLevel;
+                }
+                return zoomValue;
+            },
+            enumerable: true,
+            configurable: true
+        });
         FChartZoomControl.prototype.OnMouseDown = function (e) {
             if (FChartHelper.ObjectIsNullOrEmpty(e) || FChartHelper.ObjectIsNullOrEmpty(e.toElement)) {
                 return;
@@ -1469,7 +1493,6 @@ define(["require", "exports"], function (require, exports) {
                 if (delta == 0) {
                     return;
                 }
-                var zoomChange = 0;
                 if (delta < 0) {
                     if (left == 0) {
                         return;
@@ -1477,7 +1500,6 @@ define(["require", "exports"], function (require, exports) {
                     delta = Math.abs(delta);
                     delta = delta > left ? left : delta;
                     this.DraggerX -= delta;
-                    zoomChange = -delta / this.DraggerBigScale;
                 }
                 else {
                     if (right == 0) {
@@ -1485,7 +1507,6 @@ define(["require", "exports"], function (require, exports) {
                     }
                     delta = delta > right ? right : delta;
                     this.DraggerX += delta;
-                    zoomChange = delta / this.DraggerBigScale;
                 }
                 var bx1 = this.DraggerX - this.DraggerScale;
                 var by1 = this.DraggerY - this.CircleRadius;
@@ -1513,14 +1534,12 @@ define(["require", "exports"], function (require, exports) {
                 if (delta == 0) {
                     return;
                 }
-                var zoomChange = 0;
                 if (delta > 0) {
                     if (bottom == 0) {
                         return;
                     }
                     delta = delta > bottom ? bottom : delta;
                     this.DraggerY += delta;
-                    zoomChange = -delta / this.DraggerBigScale;
                 }
                 else {
                     if (top_1 == 0) {
@@ -1529,7 +1548,6 @@ define(["require", "exports"], function (require, exports) {
                     delta = Math.abs(delta);
                     delta = delta > top_1 ? top_1 : delta;
                     this.DraggerY -= delta;
-                    zoomChange = delta / this.DraggerBigScale;
                 }
                 var bx1 = this.DraggerX - this.CircleRadius;
                 var by1 = this.DraggerY - this.DraggerScale;
@@ -1551,6 +1569,13 @@ define(["require", "exports"], function (require, exports) {
             else {
                 this.DraggingStartPosition = e.clientY;
             }
+            this.AttachedChart.ZoomToScale(1 / this.ZoomValue);
+            var dValue = FChartHelper.RoundFloatNumber(this.ZoomValue, 3, false);
+            var strValue = dValue.toString();
+            if (dValue.toString().length > 6) {
+                strValue = dValue.toFixed(3);
+            }
+            this.LabelHolder.textContent = strValue;
         };
         return FChartZoomControl;
     }(ChartGraphObject));
@@ -2102,7 +2127,8 @@ define(["require", "exports"], function (require, exports) {
             }
             return false;
         };
-        FChartHelper.RoundFloatNumber = function (dValue, maxFloatDigits) {
+        FChartHelper.RoundFloatNumber = function (dValue, maxFloatDigits, intergerMajor) {
+            if (intergerMajor === void 0) { intergerMajor = true; }
             var dResult = 0;
             if (dValue == 0) {
                 return dValue;
@@ -2130,7 +2156,7 @@ define(["require", "exports"], function (require, exports) {
                 dResult = parseInt(strInteger);
                 return dResult;
             }
-            if (intValue != 0) {
+            if (intValue != 0 && intergerMajor) {
                 if (floatValue <= 0.5) {
                     floatValue = 0.5;
                 }
@@ -2152,18 +2178,18 @@ define(["require", "exports"], function (require, exports) {
                     floatValue = 0;
                 }
                 else if (n < maxFloatDigits) {
-                    dResult = parseInt(strInteger) + parseFloat("0." + strFloat);
+                    floatValue = parseFloat("0." + strFloat);
                 }
                 else {
-                    strFloat = strFloat.substr(n);
+                    strFloat = strFloat.substr(0, maxFloatDigits);
                     var v1 = 1;
                     for (var i = 0; i < maxFloatDigits; i++) {
                         v1 *= 10;
                     }
                     var floatTemp = parseFloat("0." + strFloat);
-                    floatValue = Math.round(floatTemp * v1) / v1;
+                    floatValue = Math.round(floatTemp * v1 + 0.5) / v1;
                 }
-                dResult = floatValue;
+                dResult = intValue + floatValue;
             }
             return dResult;
         };
@@ -2304,7 +2330,7 @@ define(["require", "exports"], function (require, exports) {
             this.Legend = new FChartLegend();
             this.Zoom = 1.0;
             this.ZoomMode = ChartZoomMode.Center;
-            this.Zoomable = false;
+            this.ShowZoomControl = false;
             this.ZoomControl = new FChartZoomControl();
             this.ShowRangeControl = false;
             this.RangeControl = new FChartRangeControl();
@@ -2341,7 +2367,6 @@ define(["require", "exports"], function (require, exports) {
             this.DEFAULT_XAXIS_RIGHT_MARGIN = 20;
             this.m_dXAxisLeftMargin = this.DEFAULT_XAXIS_LEFT_MARGIN;
             this.m_dXAxisRightMargin = this.DEFAULT_XAXIS_RIGHT_MARGIN;
-            this.ZoomLevel = 1;
             this.SortedDataSeries = false;
             this.ShowScrollBar = false;
             this.GridX = new FChartGrid();
@@ -2396,6 +2421,13 @@ define(["require", "exports"], function (require, exports) {
             set: function (value) {
                 value = Math.abs(value);
                 this.SCALE_ULIMIT = 1 / value;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(FChart.prototype, "ZoomLevel", {
+            get: function () {
+                return 1 / this.m_scale;
             },
             enumerable: true,
             configurable: true
@@ -2536,10 +2568,10 @@ define(["require", "exports"], function (require, exports) {
                 var zoomFactor = dNewScale / this.m_oldscale;
                 var scale = 0.5 * (zoomFactor - 1);
                 this.m_xl -= (this.m_xr - this.m_xl) * scale;
-                this.m_yt += (this.m_xr - this.m_xl) * scale;
+                this.m_yt += (this.m_yt - this.m_yb) * scale;
             }
             else {
-                var zoomFactor = dNewScale / this.m_oldscale;
+                var zoomFactor = this.m_oldscale / dNewScale;
                 var scale = 0.5 - 0.5 / zoomFactor;
                 this.m_xl += (this.m_xr - this.m_xl) * scale;
                 this.m_yt -= (this.m_yt - this.m_yb) * scale;
@@ -2839,7 +2871,7 @@ define(["require", "exports"], function (require, exports) {
             }
         };
         FChart.prototype.DrawZoomControl = function () {
-            if (this.Zoomable) {
+            if (this.ShowZoomControl) {
                 this.ZoomControl.Draw(this);
             }
         };
@@ -3218,7 +3250,7 @@ define(["require", "exports"], function (require, exports) {
                     xAxesHeight = this.FixedXAxesHeight;
                 }
                 var availableSpace = this.ChartHeight - xAxesHeight;
-                if (this.Zoomable && availableSpace > 0) {
+                if (this.ShowZoomControl && availableSpace > 0) {
                     if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                         var hz = availableSpace * 0.2;
                         this.ZoomControl.CalculateShortSize(hz);
@@ -3231,7 +3263,7 @@ define(["require", "exports"], function (require, exports) {
                 var maxHeight = 0;
                 if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
                     maxHeight = h * 0.3;
-                    if (this.Zoomable) {
+                    if (this.ShowZoomControl) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                             var hz = h * 0.1;
                             this.ZoomControl.CalculateShortSize(hz);
@@ -3241,7 +3273,7 @@ define(["require", "exports"], function (require, exports) {
                 }
                 else {
                     maxHeight = h * 0.5;
-                    if (this.Zoomable) {
+                    if (this.ShowZoomControl) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                             var hz = h * 0.1;
                             this.ZoomControl.CalculateShortSize(hz);
@@ -3277,7 +3309,7 @@ define(["require", "exports"], function (require, exports) {
                     yAxesWidth = this.FixedYAxesWidth;
                 }
                 var availableSpace = this.ChartWidth - yAxesWidth;
-                if (this.Zoomable && availableSpace > 0) {
+                if (this.ShowZoomControl && availableSpace > 0) {
                     if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                         var wz = availableSpace * 0.2;
                         this.ZoomControl.CalculateShortSize(wz);
@@ -3290,7 +3322,7 @@ define(["require", "exports"], function (require, exports) {
                 var maxWidth = 0;
                 if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
                     maxWidth = w * 0.3;
-                    if (this.Zoomable) {
+                    if (this.ShowZoomControl) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                             var wz = w * 0.1;
                             this.ZoomControl.CalculateShortSize(wz);
@@ -3300,7 +3332,7 @@ define(["require", "exports"], function (require, exports) {
                 }
                 else {
                     maxWidth = w * 0.5;
-                    if (this.Zoomable) {
+                    if (this.ShowZoomControl) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                             var wz = w * 0.1;
                             this.ZoomControl.CalculateShortSize(wz);
@@ -3361,7 +3393,7 @@ define(["require", "exports"], function (require, exports) {
             }
             var zoomControlWidth = 0;
             var zoomControlHeight = 0;
-            if (this.Zoomable) {
+            if (this.ShowZoomControl) {
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                     zoomControlWidth = this.ZoomControl.ShortSize;
                 }
@@ -3419,7 +3451,7 @@ define(["require", "exports"], function (require, exports) {
                     this.Legend.CalculateSize(this);
                 }
             }
-            if (this.Zoomable) {
+            if (this.ShowZoomControl) {
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                     this.ZoomControl.CalculateLongSize(this.PlotHeight);
                 }
@@ -3461,7 +3493,7 @@ define(["require", "exports"], function (require, exports) {
             var yStart = 0;
             var zoomControlWidth = 0;
             var zoomControlHeight = 0;
-            if (this.Zoomable) {
+            if (this.ShowZoomControl) {
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                     zoomControlWidth = this.ZoomControl.ShortSize;
                 }
@@ -3471,11 +3503,11 @@ define(["require", "exports"], function (require, exports) {
             }
             var rangeControlWidth = this.ShowRangeControl ? this.RangeControl.VerticalBarSize : 0;
             var rangeControlHeight = this.ShowRangeControl ? this.RangeControl.HorizontalBarSize : 0;
-            if (this.Zoomable && this.ZoomControl.Layout == ZoomControlLayout.Left) {
+            if (this.ShowZoomControl && this.ZoomControl.Layout == ZoomControlLayout.Left) {
                 this.ZoomControl.X = xStart;
                 xStart += zoomControlWidth;
             }
-            if (this.Zoomable && this.ZoomControl.Layout == ZoomControlLayout.Top) {
+            if (this.ShowZoomControl && this.ZoomControl.Layout == ZoomControlLayout.Top) {
                 this.ZoomControl.Y = yStart;
                 yStart += zoomControlHeight;
             }
@@ -3564,13 +3596,13 @@ define(["require", "exports"], function (require, exports) {
                     yStart += this.Legend.Height;
                 }
             }
-            if (this.Zoomable && this.ZoomControl.Layout == ZoomControlLayout.Right) {
+            if (this.ShowZoomControl && this.ZoomControl.Layout == ZoomControlLayout.Right) {
                 this.ZoomControl.X = xStart;
             }
-            if (this.Zoomable && this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
+            if (this.ShowZoomControl && this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                 this.ZoomControl.Y = yStart;
             }
-            if (this.Zoomable) {
+            if (this.ShowZoomControl) {
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                     if (this.ZoomControl.VerticalAlignment == VerticalAlignment.Top) {
                         this.ZoomControl.Y = this.PlotPosition.Y;
@@ -3866,7 +3898,7 @@ define(["require", "exports"], function (require, exports) {
                 divContainer.appendChild(svgLegend);
                 this.m_arrSVG.push(svgLegend);
             }
-            if (this.Zoomable) {
+            if (this.ShowZoomControl) {
                 var wz = 0;
                 var hz = 0;
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
