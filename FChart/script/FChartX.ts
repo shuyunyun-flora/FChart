@@ -1640,6 +1640,7 @@
 
     enum RangeControlMaskDock {
         Left,
+        Center,
         Right
     }
 
@@ -1652,6 +1653,7 @@
 
         private LeftMask: SVGSVGElement = null;
         private RightMask: SVGSVGElement = null;
+        private CenterMask: SVGSVGElement = null;
         private LeftTopCorner: SVGSVGElement = null;
         private LeftBottomCorner: SVGSVGElement = null;
         private RightTopCorner: SVGSVGElement = null;
@@ -1663,6 +1665,7 @@
 
         private LeftDraggerID: string = "rangecontrol-dragger-left";
         private RightDraggerID: string = "rangecontrol-dragger-right";
+        private CenterMaskID: string = "svg-rangecontrol-mask-center";
 
         private DEFAULT_HORIZONTAL_BAR_SIZE: number = 20;
         private DEFAULT_VERTICAL_BAR_SIZE: number = 20;
@@ -1870,6 +1873,13 @@
             w = this.AttachedChart.GetPlotX() + plotWidth - x;
             w = w < 0 ? 0 : w;
             this.DrawMaskGraph("svg-rangecontrol-mask-right", x, y, w, h, RangeControlMaskDock.Right);
+
+            x = this.LeftVerticalBarPosition.X + this.VerticalBarWidth;
+            y = this.AttachedChart.GetPlotY();
+            w = this.RightVerticalBarPosition.X - this.LeftVerticalBarPosition.X - this.VerticalBarWidth;
+            w = w < 0 ? 0 : w;
+            this.DrawMaskGraph("svg-rangecontrol-mask-center", x, y, w, h, RangeControlMaskDock.Center);
+
         }
 
         private DrawMaskGraph(id: string, x: number, y: number, w: number, h: number, dock: RangeControlMaskDock): void {
@@ -1880,6 +1890,7 @@
 
             this.LeftMask = dock == RangeControlMaskDock.Left ? mask : this.LeftMask;
             this.RightMask = dock == RangeControlMaskDock.Right ? mask : this.RightMask;
+            this.CenterMask = dock == RangeControlMaskDock.Center ? mask : this.CenterMask;
         }
 
         private ClearContent(): void {
@@ -1896,6 +1907,7 @@
             this.AttachedChart.RemoveSVGFromContainer(this.BottomBar);
             this.AttachedChart.RemoveSVGFromContainer(this.LeftMask);
             this.AttachedChart.RemoveSVGFromContainer(this.RightMask);
+            this.AttachedChart.RemoveSVGFromContainer(this.CenterMask);
         }
 
         private DraggingStartPosition: number = 0;
@@ -1903,17 +1915,21 @@
         private Dragging: boolean = false;
         private ClickingOnLeftDragger: boolean = false;
         private ClickingOnRightDragger: boolean = false;
+        private ClickingOnCenterMask: boolean = false;
         public OnMouseDown(e: MouseEvent): void {
             if (FChartHelper.ObjectIsNullOrEmpty(e) || FChartHelper.ObjectIsNullOrEmpty(e.toElement)) {
                 return;
             }
 
-            if (e.toElement.id == this.LeftDraggerID || e.toElement.id == this.RightDraggerID) {
+            if (e.toElement.id == this.LeftDraggerID || e.toElement.id == this.RightDraggerID || e.toElement.id == this.CenterMaskID) {
                 if (e.toElement.id == this.LeftDraggerID) {
                     this.ClickingOnLeftDragger = true;
                 }
-                else {
+                else if (e.toElement.id == this.RightDraggerID) {
                     this.ClickingOnRightDragger = true;
+                }
+                else if (e.toElement.id == this.CenterMaskID) {
+                    this.ClickingOnCenterMask = true;
                 }
                 this.DraggingStartPosition = e.clientX;
             }
@@ -1929,7 +1945,7 @@
                 return;
             }
 
-            if (this.ClickingOnLeftDragger || this.ClickingOnRightDragger) {
+            if (this.ClickingOnLeftDragger || this.ClickingOnRightDragger || this.ClickingOnCenterMask) {
                 let currentPos: number = e.clientX;
                 let delta: number = Math.abs(currentPos - this.DraggingStartPosition);
                 if (delta >= this.DragThreshold) {
@@ -1946,6 +1962,7 @@
             if (this.Dragging) {
                 this.ClickingOnLeftDragger = false;
                 this.ClickingOnRightDragger = false;
+                this.ClickingOnCenterMask = false;
                 this.Dragging = false;
             }
         }
@@ -1991,6 +2008,25 @@
 
                 let delta2: number = direction == "R" ? delta : -delta;
                 this.RightVerticalBarPosition.X += delta2;
+            }
+            else if (this.ClickingOnCenterMask) {
+                if (direction == "R") {
+                    delta = delta > space3 ? space3 : delta;
+                    this.AttachedChart.PlotRightRange = (plotWidth * this.AttachedChart.PlotRightRange + delta) / plotWidth;
+                    this.AttachedChart.PlotLeftRange = (space1 + delta) / plotWidth;
+                }
+                else {
+                    delta = delta > space1 ? space1 : delta;
+                    this.AttachedChart.PlotRightRange = (plotWidth * this.AttachedChart.PlotRightRange - delta) / plotWidth;
+                    this.AttachedChart.PlotLeftRange = (space1 - delta) / plotWidth;
+                }
+
+                let delta2: number = direction == "R" ? delta : -delta;
+                this.TopHorizontalBarPosition.X += delta2;
+                this.BottomHorizontalBarPosition.X += delta2;
+                this.LeftVerticalBarPosition.X += delta2;
+                this.RightVerticalBarPosition.X += delta2;
+
             }
             this.DraggingStartPosition = e.clientX;
 
@@ -2552,7 +2588,7 @@
         }
 
         public PlotLeftRange: number = 0;
-        public PlotRightRange: number = 0;
+        public PlotRightRange: number = 1;
 
         public m_coeff: FChartCoeff = new FChartCoeff();
         private m_scale: number = 0.0;
@@ -4300,6 +4336,8 @@
         private ResetVariablesDefaultValue() {
             this.m_dXAxisLeftMargin = this.DEFAULT_XAXIS_LEFT_MARGIN;
             this.m_dXAxisRightMargin = this.DEFAULT_XAXIS_RIGHT_MARGIN;
+            this.PlotLeftRange = 0;
+            this.PlotRightRange = 1;
         }
 
         private SetCoordinate() {

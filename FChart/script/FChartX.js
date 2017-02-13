@@ -1543,7 +1543,8 @@ define(["require", "exports"], function (require, exports) {
     var RangeControlMaskDock;
     (function (RangeControlMaskDock) {
         RangeControlMaskDock[RangeControlMaskDock["Left"] = 0] = "Left";
-        RangeControlMaskDock[RangeControlMaskDock["Right"] = 1] = "Right";
+        RangeControlMaskDock[RangeControlMaskDock["Center"] = 1] = "Center";
+        RangeControlMaskDock[RangeControlMaskDock["Right"] = 2] = "Right";
     })(RangeControlMaskDock || (RangeControlMaskDock = {}));
     var FChartRangeControl = (function (_super) {
         __extends(FChartRangeControl, _super);
@@ -1556,6 +1557,7 @@ define(["require", "exports"], function (require, exports) {
             this.RightVerticalBarPosition = new FloatPoint(0, 0);
             this.LeftMask = null;
             this.RightMask = null;
+            this.CenterMask = null;
             this.LeftTopCorner = null;
             this.LeftBottomCorner = null;
             this.RightTopCorner = null;
@@ -1566,6 +1568,7 @@ define(["require", "exports"], function (require, exports) {
             this.BottomBar = null;
             this.LeftDraggerID = "rangecontrol-dragger-left";
             this.RightDraggerID = "rangecontrol-dragger-right";
+            this.CenterMaskID = "svg-rangecontrol-mask-center";
             this.DEFAULT_HORIZONTAL_BAR_SIZE = 20;
             this.DEFAULT_VERTICAL_BAR_SIZE = 20;
             this.m_dHorizontalBarSize = this.DEFAULT_HORIZONTAL_BAR_SIZE;
@@ -1575,6 +1578,7 @@ define(["require", "exports"], function (require, exports) {
             this.Dragging = false;
             this.ClickingOnLeftDragger = false;
             this.ClickingOnRightDragger = false;
+            this.ClickingOnCenterMask = false;
         }
         Object.defineProperty(FChartRangeControl.prototype, "HorizontalBarSize", {
             get: function () {
@@ -1780,6 +1784,11 @@ define(["require", "exports"], function (require, exports) {
             w = this.AttachedChart.GetPlotX() + plotWidth - x;
             w = w < 0 ? 0 : w;
             this.DrawMaskGraph("svg-rangecontrol-mask-right", x, y, w, h, RangeControlMaskDock.Right);
+            x = this.LeftVerticalBarPosition.X + this.VerticalBarWidth;
+            y = this.AttachedChart.GetPlotY();
+            w = this.RightVerticalBarPosition.X - this.LeftVerticalBarPosition.X - this.VerticalBarWidth;
+            w = w < 0 ? 0 : w;
+            this.DrawMaskGraph("svg-rangecontrol-mask-center", x, y, w, h, RangeControlMaskDock.Center);
         };
         FChartRangeControl.prototype.DrawMaskGraph = function (id, x, y, w, h, dock) {
             var mask = this.AttachedChart.CreateSVG(id, "absolute", x.toString(), y.toString(), w.toString(), h.toString());
@@ -1788,6 +1797,7 @@ define(["require", "exports"], function (require, exports) {
             this.AttachedChart.AppendSVGToContainer(mask);
             this.LeftMask = dock == RangeControlMaskDock.Left ? mask : this.LeftMask;
             this.RightMask = dock == RangeControlMaskDock.Right ? mask : this.RightMask;
+            this.CenterMask = dock == RangeControlMaskDock.Center ? mask : this.CenterMask;
         };
         FChartRangeControl.prototype.ClearContent = function () {
             if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
@@ -1803,17 +1813,21 @@ define(["require", "exports"], function (require, exports) {
             this.AttachedChart.RemoveSVGFromContainer(this.BottomBar);
             this.AttachedChart.RemoveSVGFromContainer(this.LeftMask);
             this.AttachedChart.RemoveSVGFromContainer(this.RightMask);
+            this.AttachedChart.RemoveSVGFromContainer(this.CenterMask);
         };
         FChartRangeControl.prototype.OnMouseDown = function (e) {
             if (FChartHelper.ObjectIsNullOrEmpty(e) || FChartHelper.ObjectIsNullOrEmpty(e.toElement)) {
                 return;
             }
-            if (e.toElement.id == this.LeftDraggerID || e.toElement.id == this.RightDraggerID) {
+            if (e.toElement.id == this.LeftDraggerID || e.toElement.id == this.RightDraggerID || e.toElement.id == this.CenterMaskID) {
                 if (e.toElement.id == this.LeftDraggerID) {
                     this.ClickingOnLeftDragger = true;
                 }
-                else {
+                else if (e.toElement.id == this.RightDraggerID) {
                     this.ClickingOnRightDragger = true;
+                }
+                else if (e.toElement.id == this.CenterMaskID) {
+                    this.ClickingOnCenterMask = true;
                 }
                 this.DraggingStartPosition = e.clientX;
             }
@@ -1826,7 +1840,7 @@ define(["require", "exports"], function (require, exports) {
                 this.ProcessDragging(e);
                 return;
             }
-            if (this.ClickingOnLeftDragger || this.ClickingOnRightDragger) {
+            if (this.ClickingOnLeftDragger || this.ClickingOnRightDragger || this.ClickingOnCenterMask) {
                 var currentPos = e.clientX;
                 var delta = Math.abs(currentPos - this.DraggingStartPosition);
                 if (delta >= this.DragThreshold) {
@@ -1841,6 +1855,7 @@ define(["require", "exports"], function (require, exports) {
             if (this.Dragging) {
                 this.ClickingOnLeftDragger = false;
                 this.ClickingOnRightDragger = false;
+                this.ClickingOnCenterMask = false;
                 this.Dragging = false;
             }
         };
@@ -1880,6 +1895,23 @@ define(["require", "exports"], function (require, exports) {
                     this.AttachedChart.PlotRightRange = (plotWidth * this.AttachedChart.PlotRightRange - delta) / plotWidth;
                 }
                 var delta2 = direction == "R" ? delta : -delta;
+                this.RightVerticalBarPosition.X += delta2;
+            }
+            else if (this.ClickingOnCenterMask) {
+                if (direction == "R") {
+                    delta = delta > space3 ? space3 : delta;
+                    this.AttachedChart.PlotRightRange = (plotWidth * this.AttachedChart.PlotRightRange + delta) / plotWidth;
+                    this.AttachedChart.PlotLeftRange = (space1 + delta) / plotWidth;
+                }
+                else {
+                    delta = delta > space1 ? space1 : delta;
+                    this.AttachedChart.PlotRightRange = (plotWidth * this.AttachedChart.PlotRightRange - delta) / plotWidth;
+                    this.AttachedChart.PlotLeftRange = (space1 - delta) / plotWidth;
+                }
+                var delta2 = direction == "R" ? delta : -delta;
+                this.TopHorizontalBarPosition.X += delta2;
+                this.BottomHorizontalBarPosition.X += delta2;
+                this.LeftVerticalBarPosition.X += delta2;
                 this.RightVerticalBarPosition.X += delta2;
             }
             this.DraggingStartPosition = e.clientX;
@@ -2281,7 +2313,7 @@ define(["require", "exports"], function (require, exports) {
             this.SCALE_ULIMIT = 0.002;
             this.SCALE_LLIMIT = 1000;
             this.PlotLeftRange = 0;
-            this.PlotRightRange = 0;
+            this.PlotRightRange = 1;
             this.m_coeff = new FChartCoeff();
             this.m_scale = 0.0;
             this.Container = null;
@@ -3865,6 +3897,8 @@ define(["require", "exports"], function (require, exports) {
         FChart.prototype.ResetVariablesDefaultValue = function () {
             this.m_dXAxisLeftMargin = this.DEFAULT_XAXIS_LEFT_MARGIN;
             this.m_dXAxisRightMargin = this.DEFAULT_XAXIS_RIGHT_MARGIN;
+            this.PlotLeftRange = 0;
+            this.PlotRightRange = 1;
         };
         FChart.prototype.SetCoordinate = function () {
             var _this = this;
