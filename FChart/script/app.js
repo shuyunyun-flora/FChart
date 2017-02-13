@@ -28,7 +28,7 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         xaxis2.Title.FontSize = 11;
         xaxis2.Title.Layout = FChartX.XAxisTitleLayout.TopMiddle;
         xaxis2.Title.Label = "X axis Title 2";
-        //chart.XAxes.push(xaxis2);
+        chart.XAxes.push(xaxis2);
         var yaxis1 = new FChartX.FChartYAxis();
         yaxis1.Show = true;
         yaxis1.ID = "YAxis-1";
@@ -50,7 +50,7 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         yaxis2.Title.Layout = FChartX.YAxisTitleLayout.Center;
         yaxis2.Title.FontSize = 11;
         yaxis2.Title.Label = "Y axis Title 2";
-        //chart.YAxes.push(yaxis2);
+        chart.YAxes.push(yaxis2);
         chart.Legend.Show = true;
         chart.Legend.Layout = FChartX.LegendLayout.Top;
         chart.Legend.ContentOrientation = FChartX.Orientation.Horizontal;
@@ -116,11 +116,11 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         pt5.Y = 720;
         serie1.Data.push(pt1);
         serie1.Data.push(pt2);
-        //serie1.Data.push(pt3);
-        //serie1.Data.push(pt4);
-        //serie1.Data.push(pt5);
+        serie1.Data.push(pt3);
+        serie1.Data.push(pt4);
+        serie1.Data.push(pt5);
         chart.DataSeries.push(serie1);
-        //chart.DataSeries.push(serie2);
+        chart.DataSeries.push(serie2);
         chart.Render();
     }
 });

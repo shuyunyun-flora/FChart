@@ -2501,7 +2501,7 @@ define(["require", "exports"], function (require, exports) {
             this.m_scale /= zoomFactor;
             if (this.m_scale < this.SCALE_ULIMIT) {
                 this.m_scale = this.SCALE_ULIMIT;
-                zoomFactor = this.m_oldscale / this.SCALE_LLIMIT;
+                zoomFactor = this.m_oldscale / this.SCALE_ULIMIT;
             }
             var scale = 0.5 - 0.5 / zoomFactor;
             this.m_xl += (this.m_xr - this.m_xl) * scale;
@@ -2519,7 +2519,7 @@ define(["require", "exports"], function (require, exports) {
             }
             var scale = 0.5 * (zoomFactor - 1);
             this.m_xl -= (this.m_xr - this.m_xl) * scale;
-            this.m_yt += (this.m_xr - this.m_xl) * scale;
+            this.m_yt += (this.m_yt - this.m_yb) * scale;
             this.SetWindow();
             this.Draw(true);
         };
@@ -2658,9 +2658,9 @@ define(["require", "exports"], function (require, exports) {
         FChart.prototype.Draw = function (zoom) {
             if (zoom === void 0) { zoom = false; }
             if (zoom) {
-                this.CalculateXAxisTickCoordinate();
-                this.CalculateYAxisTickCoordinate();
-                this.CalculateDataPointCoordinate();
+                //this.CalculateXAxisTickCoordinate();
+                //this.CalculateYAxisTickCoordinate();
+                //this.CalculateDataPointCoordinate();
                 for (var i = 0; i < this.XAxesSVGS.length; i++) {
                     this.XAxesSVGS[i].innerHTML = "";
                 }
