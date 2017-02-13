@@ -1888,6 +1888,9 @@
             mask.style.setProperty("opacity", "0.5");
             this.AttachedChart.AppendSVGToContainer(mask);
 
+            if (dock == RangeControlMaskDock.Center) {
+                mask.style.setProperty("background-color", "transparent");
+            }
             this.LeftMask = dock == RangeControlMaskDock.Left ? mask : this.LeftMask;
             this.RightMask = dock == RangeControlMaskDock.Right ? mask : this.RightMask;
             this.CenterMask = dock == RangeControlMaskDock.Center ? mask : this.CenterMask;
