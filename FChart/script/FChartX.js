@@ -1748,12 +1748,14 @@ define(["require", "exports"], function (require, exports) {
             var line2 = this.AttachedChart.CreateSVGLineElement();
             FChartHelper.SetSVGLineAttributes(line2, id + "-line2", dx3.toString(), dy3.toString(), dx4.toString(), dy4.toString(), dLineWidth.toString(), "black");
             svgBar.appendChild(line2);
-            dx3 += tenthOfW * 2;
-            dx4 = dx1;
+            dx1 -= dLineWidth / 2;
+            dx2 -= dLineWidth / 2;
+            dx3 += dLineWidth / 2;
+            dx4 += dLineWidth / 2;
             var dd = "M " + dx1 + " " + dy1 + " " +
-                "L " + dx2 + " " + dy2 + " " +
-                "L " + dx4 + " " + dy4 + " " +
                 "L " + dx3 + " " + dy3 + " " +
+                "L " + dx4 + " " + dy4 + " " +
+                "L " + dx2 + " " + dy2 + " " +
                 "L " + dx1 + " " + dy1 + " " + "Z";
             var dragger = this.AttachedChart.CreateSVGPathElement();
             dragger.setAttribute("id", id);
