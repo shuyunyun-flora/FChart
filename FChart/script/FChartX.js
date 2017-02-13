@@ -112,7 +112,6 @@ define(["require", "exports"], function (require, exports) {
             this.Value2Wc = new Array();
             this.PixelsPerValue = 0;
             this.StartValue = 0;
-            this.Scale = 0;
         }
         FChartAxis.prototype.GetValueByKey = function (key) {
             var value = NaN;
@@ -262,6 +261,7 @@ define(["require", "exports"], function (require, exports) {
             this.Width = 0;
             this.Height = 0;
             this.MaxFloatDigits = 2;
+            this.Scale = 0;
         }
         FChartTick.prototype.Draw = function (chart) { };
         ;
@@ -329,7 +329,7 @@ define(["require", "exports"], function (require, exports) {
                 var tickLabelId = "xaxis-tick-label-" + this.ID + "-" + value;
                 var lx = 0;
                 var ly = 0;
-                var oneTickSpan = this.Scale * this.PixelsPerValue;
+                var oneTickSpan = this.Tick.Scale * this.PixelsPerValue;
                 var xTickLabelMaxWidth = oneTickSpan * 0.8;
                 var xTickLabelMinWidth = oneTickSpan * 0.15;
                 var xTickLabelFontSize = this.Tick.FontSize;
@@ -473,7 +473,7 @@ define(["require", "exports"], function (require, exports) {
                 var tickLabelId = "yaxis-tick-label-" + this.ID + "-" + value;
                 var lx = 0;
                 var ly = 0;
-                var oneTickSpan = this.Scale * this.PixelsPerValue;
+                var oneTickSpan = this.Tick.Scale * this.PixelsPerValue;
                 var yTickLabelMaxWidth = regionWidth * 0.5;
                 var yTickLabelMinWidth = regionWidth * 0.15;
                 var yTickLabelFontSize = this.Tick.FontSize;
@@ -2270,8 +2270,6 @@ define(["require", "exports"], function (require, exports) {
             this.ZoomMode = ChartZoomMode.Center;
             this.Zoomable = false;
             this.ZoomControl = new FChartZoomControl();
-            this.MaxZoomLevel = 5;
-            this.ZoomLevel = 1;
             this.ShowRangeControl = false;
             this.RangeControl = new FChartRangeControl();
             this.XAxes = new Array();
@@ -2305,6 +2303,7 @@ define(["require", "exports"], function (require, exports) {
             this.DEFAULT_XAXIS_RIGHT_MARGIN = 20;
             this.m_dXAxisLeftMargin = this.DEFAULT_XAXIS_LEFT_MARGIN;
             this.m_dXAxisRightMargin = this.DEFAULT_XAXIS_RIGHT_MARGIN;
+            this.ZoomLevel = 1;
             this.SortedDataSeries = false;
             this.ShowScrollBar = false;
             this.GridX = new FChartGrid();
@@ -2314,11 +2313,12 @@ define(["require", "exports"], function (require, exports) {
             this.PlotPosition = new FloatPoint(0, 0);
             this.ZoomFactor = 1.2;
             this.SCALE_ULIMIT = 0.002;
-            this.SCALE_LLIMIT = 1000;
+            this.SCALE_LLIMIT = 1;
             this.PlotLeftRange = 0;
             this.PlotRightRange = 1;
             this.m_coeff = new FChartCoeff();
-            this.m_scale = 0.0;
+            this.m_oldscale = 0.0;
+            this.m_scale = 0.0; // 1 device unit = m_scale world unit.
             this.Container = null;
             this.ContainerWidth = 0;
             this.ContainerHeight = 0;
@@ -2347,6 +2347,17 @@ define(["require", "exports"], function (require, exports) {
             },
             set: function (value) {
                 this.m_dXAxisRightMargin = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(FChart.prototype, "MaxZoomLevel", {
+            get: function () {
+                return 1 / this.SCALE_ULIMIT;
+            },
+            set: function (value) {
+                value = Math.abs(value);
+                this.SCALE_ULIMIT = 1 / value;
             },
             enumerable: true,
             configurable: true
@@ -2447,16 +2458,28 @@ define(["require", "exports"], function (require, exports) {
         });
         // Implementation.
         FChart.prototype.ZoomIn = function () {
-            this.m_scale /= this.ZoomFactor;
-            var scale = 0.5 - 0.5 / this.ZoomFactor;
+            var zoomFactor = this.ZoomFactor;
+            this.m_oldscale = this.m_scale;
+            this.m_scale /= zoomFactor;
+            if (this.m_scale < this.SCALE_ULIMIT) {
+                this.m_scale = this.SCALE_ULIMIT;
+                zoomFactor = this.m_oldscale / this.SCALE_LLIMIT;
+            }
+            var scale = 0.5 - 0.5 / zoomFactor;
             this.m_xl += (this.m_xr - this.m_xl) * scale;
             this.m_yt -= (this.m_yt - this.m_yb) * scale;
             this.SetWindow();
             this.Draw();
         };
         FChart.prototype.ZoomOut = function () {
-            this.m_scale *= this.ZoomFactor;
-            var scale = 0.5 * (this.ZoomFactor - 1);
+            var zoomFactor = this.ZoomFactor;
+            this.m_oldscale = this.m_scale;
+            this.m_scale *= zoomFactor;
+            if (this.m_scale > this.SCALE_LLIMIT) {
+                this.m_scale = this.SCALE_LLIMIT;
+                zoomFactor = this.SCALE_LLIMIT / this.m_oldscale;
+            }
+            var scale = 0.5 * (zoomFactor - 1);
             this.m_xl -= (this.m_xr - this.m_xl) * scale;
             this.m_yt += (this.m_xr - this.m_xl) * scale;
             this.SetWindow();
@@ -2469,17 +2492,17 @@ define(["require", "exports"], function (require, exports) {
             if (dNewScale > this.SCALE_LLIMIT) {
                 dNewScale = this.SCALE_LLIMIT;
             }
-            var oldScale = this.m_scale;
+            this.m_oldscale = this.m_scale;
             this.m_scale = dNewScale;
-            if (dNewScale > oldScale) {
-                var zoomFactor = dNewScale / oldScale;
-                var scale = 0.5 * (this.ZoomFactor - 1);
+            if (dNewScale > this.m_oldscale) {
+                var zoomFactor = dNewScale / this.m_oldscale;
+                var scale = 0.5 * (zoomFactor - 1);
                 this.m_xl -= (this.m_xr - this.m_xl) * scale;
                 this.m_yt += (this.m_xr - this.m_xl) * scale;
             }
             else {
-                var ZoomFactor = dNewScale / oldScale;
-                var scale = 0.5 - 0.5 / this.ZoomFactor;
+                var zoomFactor = dNewScale / this.m_oldscale;
+                var scale = 0.5 - 0.5 / zoomFactor;
                 this.m_xl += (this.m_xr - this.m_xl) * scale;
                 this.m_yt -= (this.m_yt - this.m_yb) * scale;
             }
@@ -2491,12 +2514,13 @@ define(["require", "exports"], function (require, exports) {
             var maxx = this.m_maxx;
             var miny = this.m_miny;
             var maxy = this.m_maxy;
-            this.ZoomToRegion(minx, maxy, maxx, miny);
+            this.ZoomRegion(minx, maxy, maxx, miny);
         };
-        FChart.prototype.ZoomToRegion = function (xl, yt, xr, yb) {
+        FChart.prototype.ZoomRegion = function (xl, yt, xr, yb) {
             if (xr - xl < 1.0e-30) {
                 return;
             }
+            this.m_oldscale = this.m_scale;
             var xc = (xl + xr) * 0.5;
             var yc = (yt + yb) * 0.5;
             var ratio = (this.m_yt - this.m_yb) / (this.m_xr - this.m_xl);
@@ -3577,7 +3601,7 @@ define(["require", "exports"], function (require, exports) {
                     yPixelsPerValue = this.m_height / (nYTicksCount * smallScale);
                 }
                 yaxis.PixelsPerValue = yPixelsPerValue;
-                yaxis.Scale = obj.Scale;
+                yaxis.Tick.Scale = obj.Scale;
                 if (yaxis.BottomEnvelopeLine.Show) {
                     var y = this.m_coeff.ToWcY(this.m_height);
                     yaxis.Value2Wc.push({ Key: "bottom", Value: y });
@@ -3667,7 +3691,7 @@ define(["require", "exports"], function (require, exports) {
                     xPixelsPerValue = this_1.m_width / (obj.Ticks * obj.Scale);
                     startValue = obj.StartValue;
                     xaxis.PixelsPerValue = xPixelsPerValue;
-                    xaxis.Scale = obj.Scale;
+                    xaxis.Tick.Scale = obj.Scale;
                     nTicksCount = obj.Ticks;
                     iType = 0;
                 }
@@ -3682,7 +3706,7 @@ define(["require", "exports"], function (require, exports) {
                 }
                 if (iType == 0) {
                     for (var p = 0; p <= nTicksCount; p++) {
-                        var dValue = p * xaxis.Scale;
+                        var dValue = p * xaxis.Tick.Scale;
                         var xd = dValue * xaxis.PixelsPerValue;
                         var x = this_1.m_coeff.ToWcX(xd);
                         var strLabel = dValue.toString();

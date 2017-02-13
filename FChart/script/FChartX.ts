@@ -109,7 +109,6 @@
         public Value2Wc: Array<KeyValuePair<string, number>> = new Array();
         public PixelsPerValue: number = 0;
         public StartValue: number = 0;
-        public Scale: number = 0;
 
         public GetValueByKey(key: string): number {
             let value: number = NaN;
@@ -135,21 +134,6 @@
 
         public Draw(chart: FChart): void {
         }
-    }
-
-    interface IChart {
-        DataSeries: FChartDataSerie[];
-        XAxes: FChartXAxis[];
-        YAxes: FChartYAxis[];
-        Zoom: number;
-
-        ZoomIn(): void;
-        ZoomOut(): void;
-        ZoomToScale(scale: number): void;
-        ZoomToFull(): void;
-        ZoomToRegion(xl: number, yt: number, xr: number, yb: number): void;
-
-        Render(): void;
     }
 
     enum MarkAttachTo {
@@ -183,11 +167,6 @@
         public Grouping: boolean;
         public Intersect: boolean;  // If true, the tooltip shows when the mouse position intersects with an element. 
         // If false, the tooltip shows no matter where the mouse position in the chart.
-    }
-
-    interface IChartPrinter {
-        PrintPreview(): void;
-        Print(): void;
     }
 
     export enum GridLineTextPosition {
@@ -271,6 +250,7 @@
         public Width: number = 0;
         public Height: number = 0;
         public MaxFloatDigits: number = 2;
+        public Scale: number = 0;
 
         public Draw(chart: FChart): void { };
     }
@@ -337,7 +317,7 @@
                 let tickLabelId = "xaxis-tick-label-" + this.ID + "-" + value;
                 let lx = 0;
                 let ly = 0;
-                let oneTickSpan = this.Scale * this.PixelsPerValue;
+                let oneTickSpan = this.Tick.Scale * this.PixelsPerValue;
                 let xTickLabelMaxWidth = oneTickSpan * 0.8;
                 let xTickLabelMinWidth = oneTickSpan * 0.15;
                 let xTickLabelFontSize = this.Tick.FontSize;
@@ -497,7 +477,7 @@
                 let tickLabelId = "yaxis-tick-label-" + this.ID + "-" + value;
                 let lx = 0;
                 let ly = 0;
-                let oneTickSpan = this.Scale * this.PixelsPerValue;
+                let oneTickSpan = this.Tick.Scale * this.PixelsPerValue;
                 let yTickLabelMaxWidth = regionWidth * 0.5;
                 let yTickLabelMinWidth = regionWidth * 0.15;
                 let yTickLabelFontSize = this.Tick.FontSize;
@@ -2453,7 +2433,7 @@
         }
     }
 
-    export class FChart implements IChart, IChartPrinter {
+    export class FChart {
         public BindTo: string;
         public DataSeries: FChartDataSerie[] = new Array<FChartDataSerie>();
         public Legend: FChartLegend = new FChartLegend();
@@ -2461,8 +2441,6 @@
         public ZoomMode: ChartZoomMode = ChartZoomMode.Center;
         public Zoomable: boolean = false;
         public ZoomControl: FChartZoomControl = new FChartZoomControl();
-        public MaxZoomLevel: number = 5;
-        public ZoomLevel: number = 1;
 
         public ShowRangeControl: boolean = false;
         private RangeControl: FChartRangeControl = new FChartRangeControl();
@@ -2525,6 +2503,17 @@
             this.m_dXAxisRightMargin = value;
         }
 
+        public get MaxZoomLevel(): number {
+            return 1 / this.SCALE_ULIMIT;
+        }
+
+        public set MaxZoomLevel(value: number) {
+            value = Math.abs(value);
+            this.SCALE_ULIMIT = 1 / value;
+        }
+
+        public ZoomLevel: number = 1;
+
         private SortedDataSeries: boolean = false;
 
         public ShowScrollBar: boolean = false;
@@ -2538,7 +2527,7 @@
         private PlotPosition: FloatPoint = new FloatPoint(0, 0);
         private ZoomFactor: number = 1.2;
         private SCALE_ULIMIT: number = 0.002;
-        private SCALE_LLIMIT: number = 1000;
+        private SCALE_LLIMIT: number = 1;
 
         // These variables with m_* prefix are used for plot area.
         private m_leftMargin: number;
@@ -2594,7 +2583,8 @@
         public PlotRightRange: number = 1;
 
         public m_coeff: FChartCoeff = new FChartCoeff();
-        private m_scale: number = 0.0;
+        private m_oldscale: number = 0.0;
+        private m_scale: number = 0.0;               // 1 device unit = m_scale world unit.
         private m_width: number;                     // Viewport width
         private m_height: number;                    // Viewport height
         private m_xl: number;                        // Viewport scope in world coordinate
@@ -2645,8 +2635,15 @@
 
         // Implementation.
         public ZoomIn(): void {
-            this.m_scale /= this.ZoomFactor;
-            let scale = 0.5 - 0.5 / this.ZoomFactor;
+            let zoomFactor: number = this.ZoomFactor;
+            this.m_oldscale = this.m_scale;
+
+            this.m_scale /= zoomFactor;
+            if (this.m_scale < this.SCALE_ULIMIT) {
+                this.m_scale = this.SCALE_ULIMIT;
+                zoomFactor = this.m_oldscale / this.SCALE_LLIMIT;
+            }
+            let scale = 0.5 - 0.5 / zoomFactor;
             this.m_xl += (this.m_xr - this.m_xl) * scale;
             this.m_yt -= (this.m_yt - this.m_yb) * scale;
 
@@ -2655,8 +2652,15 @@
         }
 
         public ZoomOut(): void {
-            this.m_scale *= this.ZoomFactor;
-            let scale = 0.5 * (this.ZoomFactor - 1);
+            let zoomFactor: number = this.ZoomFactor;
+            this.m_oldscale = this.m_scale;
+
+            this.m_scale *= zoomFactor;
+            if (this.m_scale > this.SCALE_LLIMIT) {
+                this.m_scale = this.SCALE_LLIMIT;
+                zoomFactor = this.SCALE_LLIMIT / this.m_oldscale;
+            }
+            let scale = 0.5 * (zoomFactor - 1);
             this.m_xl -= (this.m_xr - this.m_xl) * scale;
             this.m_yt += (this.m_xr - this.m_xl) * scale;
 
@@ -2672,18 +2676,18 @@
                 dNewScale = this.SCALE_LLIMIT;
             }
 
-            let oldScale = this.m_scale;
+            this.m_oldscale = this.m_scale;
             this.m_scale = dNewScale;
 
-            if (dNewScale > oldScale) {         // Zoom Out
-                let zoomFactor = dNewScale / oldScale;
-                let scale = 0.5 * (this.ZoomFactor - 1);
+            if (dNewScale > this.m_oldscale) {         // Zoom Out
+                let zoomFactor: number = dNewScale / this.m_oldscale;
+                let scale = 0.5 * (zoomFactor - 1);
                 this.m_xl -= (this.m_xr - this.m_xl) * scale;
                 this.m_yt += (this.m_xr - this.m_xl) * scale;
             }
-            else {                              // Zoom In
-                let ZoomFactor = dNewScale / oldScale;
-                let scale = 0.5 - 0.5 / this.ZoomFactor;
+            else {                                      // Zoom In
+                let zoomFactor: number = dNewScale / this.m_oldscale;
+                let scale = 0.5 - 0.5 / zoomFactor;
                 this.m_xl += (this.m_xr - this.m_xl) * scale;
                 this.m_yt -= (this.m_yt - this.m_yb) * scale;
             }
@@ -2698,13 +2702,15 @@
             let miny: number = this.m_miny;
             let maxy: number = this.m_maxy;
 
-            this.ZoomToRegion(minx, maxy, maxx, miny);
+            this.ZoomRegion(minx, maxy, maxx, miny);
         }
 
-        public ZoomToRegion(xl: number, yt: number, xr: number, yb: number): void {
+        public ZoomRegion(xl: number, yt: number, xr: number, yb: number): void {
             if (xr - xl < 1.0e-30) {
                 return;
             }
+
+            this.m_oldscale = this.m_scale;
 
             let xc: number = (xl + xr) * 0.5;
             let yc: number = (yt + yb) * 0.5;
@@ -3980,7 +3986,7 @@
                 }
 
                 yaxis.PixelsPerValue = yPixelsPerValue;
-                yaxis.Scale = obj.Scale;
+                yaxis.Tick.Scale = obj.Scale;
 
                 if (yaxis.BottomEnvelopeLine.Show) {
                     let y: number = this.m_coeff.ToWcY(this.m_height);
@@ -4080,7 +4086,7 @@
                     xPixelsPerValue = this.m_width / (obj.Ticks * obj.Scale);
                     startValue = obj.StartValue;
                     xaxis.PixelsPerValue = xPixelsPerValue;
-                    xaxis.Scale = obj.Scale;
+                    xaxis.Tick.Scale = obj.Scale;
                     nTicksCount = obj.Ticks;
                     iType = 0;
                 }
@@ -4096,7 +4102,7 @@
 
                 if (iType == 0) {
                     for (let p = 0; p <= nTicksCount; p++) {
-                        let dValue: number = p * xaxis.Scale;
+                        let dValue: number = p * xaxis.Tick.Scale;
                         let xd: number = dValue * xaxis.PixelsPerValue;
                         let x: number = this.m_coeff.ToWcX(xd);
                         let strLabel: string = dValue.toString();
