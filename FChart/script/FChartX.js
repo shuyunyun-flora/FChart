@@ -3933,16 +3933,28 @@ define(["require", "exports"], function (require, exports) {
             document.onmousemove = null;
             document.onmouseup = null;
             document.onmousedown = function (e) {
+                _this.OnMouseDown(e);
                 _this.ZoomControl.OnMouseDown(e);
                 _this.RangeControl.OnMouseDown(e);
             };
             document.onmousemove = function (e) {
+                _this.OnMouseMove(e);
                 _this.ZoomControl.OnMouseMove(e);
                 _this.RangeControl.OnMouseMove(e);
             };
             document.onmouseup = function (e) {
+                _this.OnMouseUp(e);
                 _this.ZoomControl.OnMouseUp(e);
                 _this.RangeControl.OnMouseUp(e);
+            };
+            document.onmouseover = function (e) {
+                _this.OnMouseOver(e);
+            };
+            document.onmouseout = function (e) {
+                _this.OnMouseOut(e);
+            };
+            document.onmousewheel = function (e) {
+                _this.OnMouseWheel(e);
             };
         };
         // Resize
@@ -3960,11 +3972,17 @@ define(["require", "exports"], function (require, exports) {
             this.Draw();
         };
         // Mouse events
-        FChart.prototype.OnMouseEnter = function (e) {
+        FChart.prototype.OnMouseOver = function (e) {
         };
         FChart.prototype.OnMouseOut = function (e) {
         };
+        FChart.prototype.OnMouseDown = function (e) {
+        };
         FChart.prototype.OnMouseMove = function (e) {
+        };
+        FChart.prototype.OnMouseUp = function (e) {
+        };
+        FChart.prototype.OnMouseWheel = function (e) {
         };
         FChart.prototype.OnClick = function (e) {
         };

@@ -4377,16 +4377,28 @@
             document.onmousemove = null;
             document.onmouseup = null;
             document.onmousedown = (e) => {
+                this.OnMouseDown(e);
                 this.ZoomControl.OnMouseDown(e);
                 this.RangeControl.OnMouseDown(e);
             };
             document.onmousemove = (e) => {
+                this.OnMouseMove(e);
                 this.ZoomControl.OnMouseMove(e);
                 this.RangeControl.OnMouseMove(e);
             }
             document.onmouseup = (e) => {
+                this.OnMouseUp(e);
                 this.ZoomControl.OnMouseUp(e);
                 this.RangeControl.OnMouseUp(e);
+            }
+            document.onmouseover = (e) => {
+                this.OnMouseOver(e);
+            }
+            document.onmouseout = (e) => {
+                this.OnMouseOut(e);
+            }
+            document.onmousewheel = (e) => {
+                this.OnMouseWheel(e);
             }
         }
 
@@ -4409,13 +4421,24 @@
         }
 
         // Mouse events
-        private OnMouseEnter(e): void {
+        private OnMouseOver(e: MouseEvent): void {
         }
 
-        private OnMouseOut(e): void {
+        private OnMouseOut(e: MouseEvent): void {
         }
 
-        private OnMouseMove(e): void {
+        private OnMouseDown(e: MouseEvent): void {
+        }
+
+        private OnMouseMove(e: MouseEvent): void {
+        }
+
+        private OnMouseUp(e: MouseEvent): void {
+
+        }
+
+        private OnMouseWheel(e: MouseEvent): void {
+
         }
 
         private OnClick(e): void {
