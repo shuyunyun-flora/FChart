@@ -1136,6 +1136,7 @@ define(["require", "exports"], function (require, exports) {
             this.DraggerX = 0;
             this.DraggerY = 0;
             this.Length = 0;
+            this.Step = 10;
             this.ClickingOnDragger = false;
             this.DraggingStartPosition = 0;
             this.DragThreshold = 5;
@@ -1256,40 +1257,14 @@ define(["require", "exports"], function (require, exports) {
                 FChartHelper.SetSVGLineAttributes(progressBar, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
                 svgZoomControl.appendChild(progressBar);
                 this.ProgressBarHolder = progressBar;
-                var scale = hb / chart.MaxZoomLevel;
-                var exponent = 0;
-                while (scale > this.MaxBarSize / 2) {
-                    scale /= 2;
-                    exponent++;
-                }
-                var bigScale = scale * Math.pow(2, exponent);
-                this.DraggerScale = scale;
-                this.DraggerBigScale = bigScale;
-                var delta = bigScale == scale ? 0 : scale;
-                var bx = cx1;
-                var by = my + 2 * r + (hb - (chart.ZoomLevel * bigScale - delta));
-                this.DraggerX = bx;
-                this.DraggerY = by;
-                var bx1 = bx - r;
-                var by1 = by - scale;
-                var bx2 = bx + r;
-                var by2 = by - scale;
-                var bx3 = bx + r;
-                var by3 = by + scale;
-                var bx4 = bx - r;
-                var by4 = by + scale;
-                var bar = chart.CreateSVGPathElement();
-                bar.setAttribute("id", this.DraggerHolderID);
-                var d = "M" + bx1.toString() + " " + by1.toString() + " " +
-                    "L" + bx2.toString() + " " + by2.toString() + " " +
-                    "L" + bx3.toString() + " " + by3.toString() + " " +
-                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
-                bar.setAttribute("d", d);
-                bar.setAttribute("stroke-width", this.LineWidth.toString());
-                bar.setAttribute("stroke", this.LineColor);
-                bar.setAttribute("fill", this.LineColor);
-                svgZoomControl.appendChild(bar);
-                this.DraggerHolder = bar;
+                var dragger = chart.CreateSVGPathElement();
+                dragger.setAttribute("id", this.DraggerHolderID);
+                dragger.setAttribute("stroke-width", this.LineWidth.toString());
+                dragger.setAttribute("stroke", this.LineColor);
+                dragger.setAttribute("fill", this.LineColor);
+                svgZoomControl.appendChild(dragger);
+                this.DraggerHolder = dragger;
+                this.UpdateDraggerData();
                 var tx = mx + r * 2 + twothOfW;
                 var ty = my + 2 * r + hb / 2;
                 var dLabelFontSize = this.FontSize;
@@ -1361,40 +1336,14 @@ define(["require", "exports"], function (require, exports) {
                 FChartHelper.SetSVGLineAttributes(progressBar, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
                 svgZoomControl.appendChild(progressBar);
                 this.ProgressBarHolder = progressBar;
-                var scale = wb / chart.MaxZoomLevel;
-                var exponent = 0;
-                while (scale > this.MaxBarSize / 2) {
-                    scale /= 2;
-                    exponent++;
-                }
-                var bigScale = scale * Math.pow(2, exponent);
-                this.DraggerScale = scale;
-                this.DraggerBigScale = bigScale;
-                var delta = bigScale == scale ? 0 : scale;
-                var bx = mx + 2 * r + chart.ZoomLevel * bigScale - delta;
-                var by = my + twothOfH + r;
-                this.DraggerX = bx;
-                this.DraggerY = by;
-                var bx1 = bx - scale;
-                var by1 = by - r;
-                var bx2 = bx + scale;
-                var by2 = by - r;
-                var bx3 = bx + scale;
-                var by3 = by + r;
-                var bx4 = bx - scale;
-                var by4 = by + r;
-                var bar = chart.CreateSVGPathElement();
-                bar.setAttribute("id", this.DraggerHolderID);
-                var d = "M" + bx1.toString() + " " + by1.toString() + " " +
-                    "L" + bx2.toString() + " " + by2.toString() + " " +
-                    "L" + bx3.toString() + " " + by3.toString() + " " +
-                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
-                bar.setAttribute("d", d);
-                bar.setAttribute("stroke-width", this.LineWidth.toString());
-                bar.setAttribute("stroke", this.LineColor);
-                bar.setAttribute("fill", this.LineColor);
-                svgZoomControl.appendChild(bar);
-                this.DraggerHolder = bar;
+                var dragger = chart.CreateSVGPathElement();
+                dragger.setAttribute("id", this.DraggerHolderID);
+                dragger.setAttribute("stroke-width", this.LineWidth.toString());
+                dragger.setAttribute("stroke", this.LineColor);
+                dragger.setAttribute("fill", this.LineColor);
+                svgZoomControl.appendChild(dragger);
+                this.DraggerHolder = dragger;
+                this.UpdateDraggerData();
                 var tx = mx + 2 * r + wb / 2;
                 var ty = my + twothOfH / 2;
                 var dLabelFontSize = this.FontSize;
@@ -1406,17 +1355,180 @@ define(["require", "exports"], function (require, exports) {
                 this.LabelHolder = text;
             }
         };
+        FChartZoomControl.prototype.Zoom = function (delta) {
+            if (this.Orientation == Orientation.Horizontal) {
+                var left = 0;
+                var right = 0;
+                var len = this.AttachedChart.MaxZoomLevel * this.DraggerBigScale;
+                var strX = this.DraggerHolder.getAttribute("x");
+                var x = parseFloat(strX);
+                var mx = this.Margin / 2;
+                var x1 = mx + 2 * this.CircleRadius;
+                var x2 = x1 + len + 2 * this.CircleRadius;
+                var offsetX = mx + this.CircleRadius * 2;
+                left = this.DraggerX - offsetX - this.DraggerScale;
+                right = offsetX + len - this.DraggerX - this.DraggerScale;
+                if (delta == 0) {
+                    return false;
+                }
+                if (delta < 0) {
+                    if (left == 0) {
+                        return false;
+                    }
+                    delta = Math.abs(delta);
+                    delta = delta > left ? left : delta;
+                    this.DraggerX -= delta;
+                }
+                else {
+                    if (right == 0) {
+                        return false;
+                    }
+                    delta = delta > right ? right : delta;
+                    this.DraggerX += delta;
+                }
+                var bx1 = this.DraggerX - this.DraggerScale;
+                var by1 = this.DraggerY - this.CircleRadius;
+                var bx2 = this.DraggerX + this.DraggerScale;
+                var by2 = this.DraggerY - this.CircleRadius;
+                var bx3 = this.DraggerX + this.DraggerScale;
+                var by3 = this.DraggerY + this.CircleRadius;
+                var bx4 = this.DraggerX - this.DraggerScale;
+                var by4 = this.DraggerY + this.CircleRadius;
+                var d = "M" + bx1.toString() + " " + by1.toString() + " " +
+                    "L" + bx2.toString() + " " + by2.toString() + " " +
+                    "L" + bx3.toString() + " " + by3.toString() + " " +
+                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
+                this.DraggerHolder.setAttribute("d", d);
+            }
+            else {
+                var bottom = 0;
+                var top_1 = 0;
+                var len = this.AttachedChart.MaxZoomLevel * this.DraggerBigScale;
+                var my = this.Margin / 2;
+                var offsetY = my + this.CircleRadius * 2;
+                bottom = offsetY + len - this.DraggerY - this.DraggerScale;
+                top_1 = this.DraggerY - offsetY - this.DraggerScale;
+                if (delta == 0) {
+                    return false;
+                }
+                if (delta > 0) {
+                    if (bottom == 0) {
+                        return false;
+                    }
+                    delta = delta > bottom ? bottom : delta;
+                    this.DraggerY += delta;
+                }
+                else {
+                    if (top_1 == 0) {
+                        return false;
+                    }
+                    delta = Math.abs(delta);
+                    delta = delta > top_1 ? top_1 : delta;
+                    this.DraggerY -= delta;
+                }
+                var bx1 = this.DraggerX - this.CircleRadius;
+                var by1 = this.DraggerY - this.DraggerScale;
+                var bx2 = this.DraggerX + this.CircleRadius;
+                var by2 = this.DraggerY - this.DraggerScale;
+                var bx3 = this.DraggerX + this.CircleRadius;
+                var by3 = this.DraggerY + this.DraggerScale;
+                var bx4 = this.DraggerX - this.CircleRadius;
+                var by4 = this.DraggerY + this.DraggerScale;
+                var d = "M" + bx1.toString() + " " + by1.toString() + " " +
+                    "L" + bx2.toString() + " " + by2.toString() + " " +
+                    "L" + bx3.toString() + " " + by3.toString() + " " +
+                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
+                this.DraggerHolder.setAttribute("d", d);
+            }
+            this.AttachedChart.ZoomToScale(1 / this.ZoomValue);
+            var dValue = FChartHelper.RoundFloatNumber(this.ZoomValue, 3, false);
+            var strValue = dValue.toString();
+            if (dValue.toString().length > 6) {
+                strValue = dValue.toFixed(3);
+            }
+            this.LabelHolder.textContent = strValue;
+            return true;
+        };
         FChartZoomControl.prototype.OnZoomIn = function (e) {
             if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
                 return;
             }
-            this.AttachedChart.ZoomIn();
+            this.Zoom(-this.Step);
         };
         FChartZoomControl.prototype.OnZoomOut = function (e) {
             if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
                 return;
             }
-            this.AttachedChart.ZoomOut();
+            this.Zoom(this.Step);
+        };
+        FChartZoomControl.prototype.UpdateDraggerData = function () {
+            var length = 0;
+            if (this.Orientation == Orientation.Horizontal) {
+                length = this.ProgressBarHolder.x2.baseVal.value - this.ProgressBarHolder.x1.baseVal.value;
+            }
+            else {
+                length = this.ProgressBarHolder.y2.baseVal.value - this.ProgressBarHolder.y1.baseVal.value;
+            }
+            var scale = length / this.AttachedChart.MaxZoomLevel;
+            var exponent = 0;
+            while (scale > this.MaxBarSize / 2) {
+                scale /= 2;
+                exponent++;
+            }
+            var bigScale = scale * Math.pow(2, exponent);
+            this.DraggerScale = scale;
+            this.DraggerBigScale = bigScale;
+            var delta = bigScale == scale ? 0 : scale;
+            var mx = this.Margin / 2;
+            var my = this.Margin / 2;
+            var r = this.CircleRadius;
+            if (this.Orientation == Orientation.Horizontal) {
+                var twothOfH = this.ShortSize / 2;
+                var bx = mx + 2 * r + this.AttachedChart.ZoomLevel * bigScale - delta;
+                var by = my + twothOfH + r;
+                this.DraggerX = bx;
+                this.DraggerY = by;
+                var bx1 = bx - scale;
+                var by1 = by - r;
+                var bx2 = bx + scale;
+                var by2 = by - r;
+                var bx3 = bx + scale;
+                var by3 = by + r;
+                var bx4 = bx - scale;
+                var by4 = by + r;
+                var d = "M" + bx1.toString() + " " + by1.toString() + " " +
+                    "L" + bx2.toString() + " " + by2.toString() + " " +
+                    "L" + bx3.toString() + " " + by3.toString() + " " +
+                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
+                this.DraggerHolder.setAttribute("d", d);
+            }
+            else {
+                var bx = mx + r;
+                var by = my + 2 * r + (length - (this.AttachedChart.ZoomLevel * bigScale - delta));
+                this.DraggerX = bx;
+                this.DraggerY = by;
+                var bx1 = bx - r;
+                var by1 = by - scale;
+                var bx2 = bx + r;
+                var by2 = by - scale;
+                var bx3 = bx + r;
+                var by3 = by + scale;
+                var bx4 = bx - r;
+                var by4 = by + scale;
+                var d = "M" + bx1.toString() + " " + by1.toString() + " " +
+                    "L" + bx2.toString() + " " + by2.toString() + " " +
+                    "L" + bx3.toString() + " " + by3.toString() + " " +
+                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
+                this.DraggerHolder.setAttribute("d", d);
+            }
+            if (!FChartHelper.ObjectIsNullOrEmpty(this.LabelHolder)) {
+                var dValue = FChartHelper.RoundFloatNumber(this.AttachedChart.ZoomLevel, 3, false);
+                var strValue = dValue.toString();
+                if (dValue.toString().length > 6) {
+                    strValue = dValue.toFixed(3);
+                }
+                this.LabelHolder.textContent = strValue;
+            }
         };
         Object.defineProperty(FChartZoomControl.prototype, "ZoomValue", {
             get: function () {
@@ -1479,89 +1591,13 @@ define(["require", "exports"], function (require, exports) {
             var delta = 0;
             if (this.Orientation == Orientation.Horizontal) {
                 delta = e.clientX - this.DraggingStartPosition;
-                var left = 0;
-                var right = 0;
-                var len = this.AttachedChart.MaxZoomLevel * this.DraggerBigScale;
-                var strX = this.DraggerHolder.getAttribute("x");
-                var x = parseFloat(strX);
-                var mx = this.Margin / 2;
-                var x1 = mx + 2 * this.CircleRadius;
-                var x2 = x1 + len + 2 * this.CircleRadius;
-                var offsetX = mx + this.CircleRadius * 2;
-                left = this.DraggerX - offsetX - this.DraggerScale;
-                right = offsetX + len - this.DraggerX - this.DraggerScale;
-                if (delta == 0) {
-                    return;
-                }
-                if (delta < 0) {
-                    if (left == 0) {
-                        return;
-                    }
-                    delta = Math.abs(delta);
-                    delta = delta > left ? left : delta;
-                    this.DraggerX -= delta;
-                }
-                else {
-                    if (right == 0) {
-                        return;
-                    }
-                    delta = delta > right ? right : delta;
-                    this.DraggerX += delta;
-                }
-                var bx1 = this.DraggerX - this.DraggerScale;
-                var by1 = this.DraggerY - this.CircleRadius;
-                var bx2 = this.DraggerX + this.DraggerScale;
-                var by2 = this.DraggerY - this.CircleRadius;
-                var bx3 = this.DraggerX + this.DraggerScale;
-                var by3 = this.DraggerY + this.CircleRadius;
-                var bx4 = this.DraggerX - this.DraggerScale;
-                var by4 = this.DraggerY + this.CircleRadius;
-                var d = "M" + bx1.toString() + " " + by1.toString() + " " +
-                    "L" + bx2.toString() + " " + by2.toString() + " " +
-                    "L" + bx3.toString() + " " + by3.toString() + " " +
-                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
-                this.DraggerHolder.setAttribute("d", d);
             }
             else {
                 delta = e.clientY - this.DraggingStartPosition;
-                var bottom = 0;
-                var top_1 = 0;
-                var len = this.AttachedChart.MaxZoomLevel * this.DraggerBigScale;
-                var my = this.Margin / 2;
-                var offsetY = my + this.CircleRadius * 2;
-                bottom = offsetY + len - this.DraggerY - this.DraggerScale;
-                top_1 = this.DraggerY - offsetY - this.DraggerScale;
-                if (delta == 0) {
-                    return;
-                }
-                if (delta > 0) {
-                    if (bottom == 0) {
-                        return;
-                    }
-                    delta = delta > bottom ? bottom : delta;
-                    this.DraggerY += delta;
-                }
-                else {
-                    if (top_1 == 0) {
-                        return;
-                    }
-                    delta = Math.abs(delta);
-                    delta = delta > top_1 ? top_1 : delta;
-                    this.DraggerY -= delta;
-                }
-                var bx1 = this.DraggerX - this.CircleRadius;
-                var by1 = this.DraggerY - this.DraggerScale;
-                var bx2 = this.DraggerX + this.CircleRadius;
-                var by2 = this.DraggerY - this.DraggerScale;
-                var bx3 = this.DraggerX + this.CircleRadius;
-                var by3 = this.DraggerY + this.DraggerScale;
-                var bx4 = this.DraggerX - this.CircleRadius;
-                var by4 = this.DraggerY + this.DraggerScale;
-                var d = "M" + bx1.toString() + " " + by1.toString() + " " +
-                    "L" + bx2.toString() + " " + by2.toString() + " " +
-                    "L" + bx3.toString() + " " + by3.toString() + " " +
-                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
-                this.DraggerHolder.setAttribute("d", d);
+            }
+            var changeStart = this.Zoom(delta);
+            if (!changeStart) {
+                return;
             }
             if (this.Orientation == Orientation.Horizontal) {
                 this.DraggingStartPosition = e.clientX;
@@ -1569,13 +1605,6 @@ define(["require", "exports"], function (require, exports) {
             else {
                 this.DraggingStartPosition = e.clientY;
             }
-            this.AttachedChart.ZoomToScale(1 / this.ZoomValue);
-            var dValue = FChartHelper.RoundFloatNumber(this.ZoomValue, 3, false);
-            var strValue = dValue.toString();
-            if (dValue.toString().length > 6) {
-                strValue = dValue.toFixed(3);
-            }
-            this.LabelHolder.textContent = strValue;
         };
         return FChartZoomControl;
     }(ChartGraphObject));
@@ -2170,7 +2199,7 @@ define(["require", "exports"], function (require, exports) {
                 for (var i = strFloat.length - 1; i >= 0; i--) {
                     var c = strFloat.charAt(i);
                     if (c != "0") {
-                        n = i;
+                        n = i + 1;
                         break;
                     }
                 }
