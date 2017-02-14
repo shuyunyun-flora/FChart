@@ -127,6 +127,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.Value2Wc = new Array();
             this.PixelsPerValue = 0;
             this.StartValue = 0;
+            this.Type = ChartAxisType.XAxis;
         }
         FChartAxis.prototype.GetValueByKey = function (key) {
             var value = NaN;
@@ -310,13 +311,14 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
     var FChartXAxis = (function (_super) {
         __extends(FChartXAxis, _super);
         function FChartXAxis() {
-            _super.apply(this, arguments);
+            _super.call(this);
             this.Height = 0;
-            this.Type = XAxisType.Date;
+            this.ValueType = XAxisType.Date;
             this.TickSelection = XAxisDateTickSelection.Day;
             this.CullingTick = false;
             this.CullingTicksCount = 0;
             this.Title = null;
+            this.Type = ChartAxisType.XAxis;
         }
         FChartXAxis.prototype.Draw = function (chart) {
             // Draw axis line and tick.
@@ -324,7 +326,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             var x = 0;
             var y = this.LineWidth / 2;
             var svg = chart.GetSVGSVGElementByID("svg-xaxis-" + this.ID, true);
-            if (chart.GetDisplayXAxesCount() == 1) {
+            if (chart.GetVisibleXAxesCount() == 1) {
                 svg = chart.GetSVGSVGElementByID("svg-xaxis-bottom", true);
             }
             FChartHelper.SetSVGLineAttributes(xAxisLine, "xaxis-line" + this.ID, x.toString(), y.toString(), svg.clientWidth.toString(), y.toString(), this.LineWidth.toString(), this.LineColor);
@@ -335,7 +337,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 var obj = this.Value2Wc[i];
                 var value = obj.Key;
                 var wcx = obj.Value;
-                var ix = chart.PlotXStart + chart.m_coeff.ToDvcX(wcx);
+                var ix = chart.XAxisLeftMargin + chart.m_coeff.ToDvcX(wcx);
                 var tickLine = chart.CreateSVGLineElement();
                 var tickLineId = "xaxis-tick-" + this.ID + "-" + ix.toString();
                 var fifthOfHalfH = this.Height / 2 * 0.2;
@@ -381,7 +383,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             if (FChartHelper.ObjectIsNullOrEmpty(this.Title)) {
                 return;
             }
-            var nXCount = chart.GetDisplayXAxesCount();
+            var nXCount = chart.GetVisibleXAxesCount();
             var svg = null;
             var yStart = 0;
             if (nXCount == 1) {
@@ -413,7 +415,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
     var FChartYAxis = (function (_super) {
         __extends(FChartYAxis, _super);
         function FChartYAxis() {
-            _super.apply(this, arguments);
+            _super.call(this);
             this.Width = 0;
             this.Title = new FChartYAxisTitle();
             this.Layout = YAxisLayout.Left;
@@ -424,6 +426,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.MarginBetweenTickAndLabel = 0;
             this.MaxTickLabelWidth = 0;
             this.PlotY = 0;
+            this.Type = ChartAxisType.YAxis;
         }
         FChartYAxis.prototype.Draw = function (chart) {
             // Draw axis line and tick.
@@ -609,10 +612,10 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 var data = this.Data[i];
                 var x = data.fx;
                 var y = data.fy;
-                var ix = chart.PlotXStart + chart.m_coeff.ToDvcX(x);
+                var ix = chart.m_coeff.ToDvcX(x);
                 var iy = chart.m_coeff.ToDvcY(y);
                 var pt = svgPlot.createSVGPoint();
-                pt.x = ix;
+                pt.x = chart.XAxisLeftMargin + ix;
                 pt.y = iy - yaxis.PlotY;
                 serieLine.points.appendItem(pt);
             }
@@ -624,7 +627,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             }
             for (var i = 0; i < this.Data.length; i++) {
                 var data = this.Data[i];
-                var ix = chart.PlotXStart + chart.m_coeff.ToDvcX(data.fx);
+                var ix = chart.XAxisLeftMargin + chart.m_coeff.ToDvcX(data.fx);
                 var iy = chart.m_coeff.ToDvcY(data.fy);
                 if (data.Show) {
                     // Draw mark.
@@ -640,11 +643,11 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.Data.sort(function (a, b) {
                 var value1;
                 var value2;
-                if (xaxis.Type == XAxisType.Date) {
+                if (xaxis.ValueType == XAxisType.Date) {
                     value1 = (new Date(a.X)).valueOf();
                     value2 = (new Date(b.X)).valueOf();
                 }
-                else if (xaxis.Type == XAxisType.Number) {
+                else if (xaxis.ValueType == XAxisType.Number) {
                     value1 = parseFloat(a.X);
                     value2 = parseFloat(b.X);
                 }
@@ -1575,11 +1578,9 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 }
             }
             else if (e.toElement.id == this.ZoomInHolderID) {
-                this.OnZoomIn(e);
                 this.TimerID = setInterval(function () { _this.OnZoomIn(null); }, 100);
             }
             else if (e.toElement.id == this.ZoomOutHolderID) {
-                this.OnZoomOut(e);
                 this.TimerID = setInterval(function () { _this.OnZoomOut(null); }, 100);
             }
         };
@@ -2604,6 +2605,12 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             enumerable: true,
             configurable: true
         });
+        FChart.prototype.GetPlotX = function () {
+            return this.PlotPosition.X;
+        };
+        FChart.prototype.GetPlotY = function () {
+            return this.PlotPosition.Y;
+        };
         Object.defineProperty(FChart.prototype, "MarginLeft", {
             get: function () {
                 return this.m_leftMargin;
@@ -2654,13 +2661,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     dMargin += this.XAxisRightMargin;
                 }
                 return dMargin;
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(FChart.prototype, "PlotXStart", {
-            get: function () {
-                return this.XAxisLeftMargin > 0 ? this.XAxisLeftMargin : 0;
             },
             enumerable: true,
             configurable: true
@@ -2973,8 +2973,8 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             }
         };
         FChart.prototype.DrawGridLine = function () {
-            var nXAxesCount = this.GetDisplayXAxesCount();
-            var nYAxesCount = this.GetDisplayYAxesCount();
+            var nXAxesCount = this.GetVisibleXAxesCount();
+            var nYAxesCount = this.GetVisibleYAxesCount();
             var svgPlot = this.GetPlotSVG();
             if (FChartHelper.ObjectIsNullOrEmpty(svgPlot)) {
                 return;
@@ -2982,13 +2982,13 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             var plotWidth = svgPlot.clientWidth;
             var plotHeight = svgPlot.clientHeight;
             if (this.GridX.Show && nXAxesCount <= 1) {
-                var xaxis = this.GetXAxis();
+                var xaxis = this.GetUniqueXAxis();
                 if (!FChartHelper.ObjectIsNullOrEmpty(xaxis)) {
                     for (var i = 0; i < xaxis.Value2Wc.length; i++) {
                         var obj = xaxis.Value2Wc[i];
                         var key = obj.Key;
                         var value = obj.Value;
-                        var ix = this.PlotXStart + this.m_coeff.ToDvcX(value);
+                        var ix = this.XAxisLeftMargin + this.m_coeff.ToDvcX(value);
                         var y1 = 0;
                         var y2 = plotHeight;
                         var id = xaxis.ID + "-x-gridline-" + i.toString();
@@ -3004,7 +3004,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 if (FChartHelper.ObjectIsNullOrEmpty(xaxis)) {
                     continue;
                 }
-                var ix = this.PlotXStart + xaxis.GetCoordByValue(gridline.Value);
+                var ix = this.XAxisLeftMargin + xaxis.GetCoordByValue(gridline.Value);
                 var y1 = 0;
                 var y2 = plotHeight;
                 var line = this.CreateSVGLineElement();
@@ -3032,15 +3032,15 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 svgPlot.appendChild(text);
             }
             if (this.GridY.Show && nYAxesCount <= 1) {
-                var yaxis = this.GetYAxis();
+                var yaxis = this.GetUniqueYAxis();
                 if (!FChartHelper.ObjectIsNullOrEmpty(yaxis)) {
                     for (var i = 0; i < yaxis.Value2Wc.length; i++) {
                         var obj = yaxis.Value2Wc[i];
                         var key = obj.Key;
                         var value = obj.Value;
                         var iy = this.m_coeff.ToDvcY(value);
-                        var x1 = this.PlotXStart;
-                        var x2 = this.PlotXStart + plotWidth;
+                        var x1 = this.XAxisLeftMargin;
+                        var x2 = plotWidth - this.XAxisRightMargin;
                         if (key == "top" || key == "bottom") {
                             continue;
                         }
@@ -3058,8 +3058,8 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     continue;
                 }
                 var iy = yaxis.GetCoordByValue(gridline.Value);
-                var x1 = this.PlotXStart;
-                var x2 = this.PlotXStart + plotWidth;
+                var x1 = this.XAxisLeftMargin;
+                var x2 = plotWidth - this.XAxisRightMargin;
                 var line = this.CreateSVGLineElement();
                 var id = yaxis.ID + "-y-extra-gridline-" + i.toString();
                 FChartHelper.SetSVGLineAttributes(line, id, x1.toString(), iy.toString(), x2.toString(), iy.toString(), gridline.LineWidth.toString(), gridline.LineColor);
@@ -3082,7 +3082,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     lx = plotWidth;
                     textAnchor = "end";
                 }
-                lx += this.PlotXStart;
+                lx += this.XAxisLeftMargin;
                 var text = this.CreateSVGTextElement();
                 var textID = yaxis.ID + "-y-extra-gridline-text-" + i.toString();
                 FChartHelper.SetSVGTextAttributes(text, textID, lx.toString(), ly.toString(), gridline.Text, textAnchor, gridline.FontFamily, gridline.FontStyle, gridline.FontSize.toString(), gridline.FontWeight);
@@ -3151,55 +3151,55 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             }
             return yaxis;
         };
-        FChart.prototype.GetDisplayXAxesCount = function () {
+        FChart.prototype.GetVisibleXAxesCount = function () {
             var nCount = 0;
             for (var i = 0; i < this.XAxes.length; i++) {
                 var xaxis = this.XAxes[i];
-                if (xaxis.Show) {
+                if (this.IsAxisVisible(xaxis)) {
                     nCount++;
                 }
             }
             return nCount;
         };
-        FChart.prototype.GetXAxis = function () {
-            var nXCount = this.GetDisplayXAxesCount();
+        FChart.prototype.GetUniqueXAxis = function () {
+            var nXCount = this.GetVisibleXAxesCount();
             if (nXCount != 1) {
                 return null;
             }
             var xaxis = null;
             for (var i = 0; i < this.XAxes.length; i++) {
-                if (this.XAxes[i].Show) {
+                if (this.IsAxisVisible(this.XAxes[i])) {
                     xaxis = this.XAxes[i];
                     break;
                 }
             }
             return xaxis;
         };
-        FChart.prototype.GetDisplayYAxesCount = function () {
+        FChart.prototype.GetVisibleYAxesCount = function () {
             var nCount = 0;
             for (var i = 0; i < this.YAxes.length; i++) {
                 var yaxis = this.YAxes[i];
-                if (yaxis.Show) {
+                if (this.IsAxisVisible(yaxis)) {
                     nCount++;
                 }
             }
             return nCount;
         };
-        FChart.prototype.GetYAxis = function () {
-            var nYCount = this.GetDisplayYAxesCount();
+        FChart.prototype.GetUniqueYAxis = function () {
+            var nYCount = this.GetVisibleYAxesCount();
             if (nYCount != 1) {
                 return null;
             }
             var yaxis = null;
             for (var i = 0; i < this.YAxes.length; i++) {
-                if (this.YAxes[i].Show) {
+                if (this.IsAxisVisible(this.YAxes[i])) {
                     yaxis = this.YAxes[i];
                     break;
                 }
             }
             return yaxis;
         };
-        FChart.prototype.GetVisibleDataSeriesCount = function () {
+        FChart.prototype.GetDisplayDataSeriesCount = function () {
             var nCount = 0;
             for (var i = 0; i < this.DataSeries.length; i++) {
                 var serie = this.DataSeries[i];
@@ -3233,12 +3233,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         FChart.prototype.GetPlotHeight = function () {
             var svgPlot = this.GetPlotSVG();
             return svgPlot.clientHeight;
-        };
-        FChart.prototype.GetPlotX = function () {
-            return this.PlotPosition.X;
-        };
-        FChart.prototype.GetPlotY = function () {
-            return this.PlotPosition.Y;
         };
         FChart.prototype.GetLegendSVG = function () {
             var legendID = "svg-legend";
@@ -3338,13 +3332,13 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                             var x0 = serie.Data[j - 1].X;
                             var value1 = void 0;
                             var value0 = void 0;
-                            if (xaxis.Type == XAxisType.Date) {
+                            if (xaxis.ValueType == XAxisType.Date) {
                                 value1 = (new Date(x1)).valueOf();
                                 value0 = (new Date(x0)).valueOf();
                             }
-                            else if (xaxis.Type == XAxisType.Number) {
-                                value1 = parseInt(x1);
-                                value0 = parseInt(x0);
+                            else if (xaxis.ValueType == XAxisType.Number) {
+                                value1 = parseFloat(x1);
+                                value0 = parseFloat(x0);
                             }
                             dSum += (value1 - value0);
                         }
@@ -3476,7 +3470,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         };
         FChart.prototype.CalculateXAxesHeight = function (h) {
             var xAxesHeight = 0;
-            var nCount = this.GetDisplayXAxesCount();
+            var nCount = this.GetVisibleXAxesCount();
             if (this.UseFixedXAxesHeight) {
                 this.FixedXAxesHeight = Math.abs(this.FixedXAxesHeight);
                 if (this.FixedXAxesLengthType == LengthType.Percentage) {
@@ -3537,7 +3531,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         };
         FChart.prototype.CalculateYAxesWidth = function (w) {
             var yAxesWidth = 0;
-            var nCount = this.GetDisplayYAxesCount();
+            var nCount = this.GetVisibleYAxesCount();
             if (this.UseFixedYAxesWidth) {
                 var wYAxes = 0;
                 this.FixedYAxesWidth = Math.abs(this.FixedYAxesWidth);
@@ -3621,7 +3615,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             var dYAxesWidth = 0;
             var dPlotWidth = 0;
             var yAxesWidth = this.CalculateYAxesWidth(this.ChartWidth);
-            var nCountY = this.GetDisplayYAxesCount();
+            var nCountY = this.GetVisibleYAxesCount();
             var yw = (yAxesWidth == 0 || nCountY == 0) ? 0 : yAxesWidth / nCountY;
             for (var i = 0; i < this.YAxes.length; i++) {
                 if (this.YAxes[i].Show) {
@@ -3630,7 +3624,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 }
             }
             var xAxesHeight = this.CalculateXAxesHeight(this.ChartHeight);
-            var nCountX = this.GetDisplayXAxesCount();
+            var nCountX = this.GetVisibleXAxesCount();
             var xh = (xAxesHeight == 0 || nCountX == 0) ? 0 : xAxesHeight / nCountX;
             for (var i = 0; i < this.XAxes.length; i++) {
                 if (this.XAxes[i].Show) {
@@ -3714,13 +3708,13 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.SetWindow();
         };
         FChart.prototype.CalculatePartsPosition = function () {
-            var nDisplayXAxesCount = this.GetDisplayXAxesCount();
-            var xaxis = this.GetXAxis();
+            var nDisplayXAxesCount = this.GetVisibleXAxesCount();
+            var xaxis = this.GetUniqueXAxis();
             var lyaxes = new Array();
             var ryaxes = new Array();
             for (var i = 0; i < this.YAxes.length; i++) {
                 var yaxis = this.YAxes[i];
-                if (!yaxis.Show) {
+                if (!this.IsAxisVisible(yaxis)) {
                     continue;
                 }
                 if (yaxis.Layout == YAxisLayout.Left) {
@@ -3879,7 +3873,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 var minY = Number.MAX_VALUE;
                 var maxY = Number.MIN_VALUE;
                 var yaxis = this.YAxes[i];
-                if (!this.AxisNeedToCalculateTick(yaxis, ChartAxisType.YAxis)) {
+                if (!this.AxisHasDataSerie(yaxis)) {
                     continue;
                 }
                 for (var j = 0; j < this.DataSeries.length; j++) {
@@ -3968,16 +3962,16 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         FChart.prototype.CalculateXAxisTickCoordinate = function () {
             for (var i = 0; i < this.XAxes.length; i++) {
                 var xaxis = this.XAxes[i];
-                if (!this.AxisNeedToCalculateTick(xaxis, ChartAxisType.XAxis)) {
+                if (!this.AxisHasDataSerie(xaxis)) {
                     continue;
                 }
                 var minX = void 0;
                 var maxX = void 0;
-                if (xaxis.Type == XAxisType.Date) {
+                if (xaxis.ValueType == XAxisType.Date) {
                     minX = new Date("2050-01-01 00:00:00").valueOf();
                     maxX = new Date("1975-01-01 00:00:00").valueOf();
                 }
-                else if (xaxis.Type == XAxisType.Number) {
+                else if (xaxis.ValueType == XAxisType.Number) {
                     minX = Number.MAX_VALUE;
                     maxX = Number.MIN_VALUE;
                 }
@@ -3990,10 +3984,10 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     for (var k = 0; k < serie.Data.length; k++) {
                         var xValue = serie.Data[k].X;
                         var value = void 0;
-                        if (xaxis.Type == XAxisType.Date) {
+                        if (xaxis.ValueType == XAxisType.Date) {
                             value = new Date(xValue).valueOf();
                         }
-                        else if (xaxis.Type == XAxisType.Number) {
+                        else if (xaxis.ValueType == XAxisType.Number) {
                             value = parseFloat(xValue);
                         }
                         if (value > maxX) {
@@ -4013,7 +4007,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 var nTicksCount = 0;
                 var obj2 = null;
                 xaxis.Value2Wc = new Array();
-                if (xaxis.Type == XAxisType.Number || (xaxis.Type == XAxisType.Date && xaxis.TickSelection == XAxisDateTickSelection.DateAsNumber)) {
+                if (xaxis.ValueType == XAxisType.Number || (xaxis.ValueType == XAxisType.Date && xaxis.TickSelection == XAxisDateTickSelection.DateAsNumber)) {
                     maxAverageDiff = this.GetXAxisAverageDiff(xaxis.ID);
                     var obj = this.GetXAxisTickCount(xaxis.ID, maxAverageDiff, maxX, minX, this.m_width);
                     xPixelsPerValue = this.m_width / (obj.Ticks * obj.Scale);
@@ -4023,7 +4017,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     nTicksCount = obj.Ticks;
                     iType = 0;
                 }
-                else if (xaxis.Type == XAxisType.Date) {
+                else if (xaxis.ValueType == XAxisType.Date) {
                     var obj = this.GetXAxisTickCount2(xaxis.ID, maxX, minX, this.m_width);
                     xPixelsPerValue = this.m_width / (obj.Ticks.length);
                     startValue = obj.StartValue;
@@ -4063,11 +4057,11 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     var xValue = null;
                     var yValue = null;
                     var dp = this.DataSeries[i].Data[j];
-                    if (xaxis.Type == XAxisType.Date) {
+                    if (xaxis.ValueType == XAxisType.Date) {
                         xValue = (new Date(dp.X)).valueOf();
                     }
-                    else if (xaxis.Type == XAxisType.Number) {
-                        xValue = parseInt(dp.X);
+                    else if (xaxis.ValueType == XAxisType.Number) {
+                        xValue = parseFloat(dp.X);
                     }
                     yValue = dp.Y;
                     var fx = (xValue - xaxis.StartValue) * xaxis.PixelsPerValue;
@@ -4077,22 +4071,28 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 }
             }
         };
-        FChart.prototype.AxisNeedToCalculateTick = function (axis, t) {
+        FChart.prototype.AxisHasDataSerie = function (axis) {
             if (FChartHelper.ObjectIsNullOrEmpty(axis)) {
                 return false;
             }
-            var bNeedToCalculate = false;
+            var bHas = false;
             for (var i = 0; i < this.DataSeries.length; i++) {
                 var serie = this.DataSeries[i];
                 if (!serie.Show) {
                     continue;
                 }
-                bNeedToCalculate = t == ChartAxisType.XAxis ? (serie.XAxisID == axis.ID) : (serie.YAxisID == axis.ID);
-                if (bNeedToCalculate) {
+                bHas = axis.Type == ChartAxisType.XAxis ? (serie.XAxisID == axis.ID) : (serie.YAxisID == axis.ID);
+                if (bHas) {
                     break;
                 }
             }
-            return bNeedToCalculate;
+            return bHas;
+        };
+        FChart.prototype.IsAxisVisible = function (axis) {
+            if (FChartHelper.ObjectIsNullOrEmpty(axis)) {
+                return false;
+            }
+            return (axis.Show && this.AxisHasDataSerie(axis));
         };
         FChart.prototype.AppendSVGToContainer = function (svg) {
             if (FChartHelper.ObjectIsNullOrEmpty(svg)) {
@@ -4134,9 +4134,9 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             divContainer.appendChild(svgPlot);
             this.m_arrSVG.push(svgPlot);
             this.PlotSVG = svgPlot;
-            var nXCount = this.GetDisplayXAxesCount();
+            var nXCount = this.GetVisibleXAxesCount();
             if (nXCount == 1) {
-                var xaxis = this.GetXAxis();
+                var xaxis = this.GetUniqueXAxis();
                 var svgTop = this.CreateSVG("svg-xaxis-top", "absolute", this.PlotPosition.X.toString(), "0", this.PlotWidth.toString(), (xaxis.Height / 2).toString());
                 divContainer.appendChild(svgTop);
                 this.m_arrSVG.push(svgTop);

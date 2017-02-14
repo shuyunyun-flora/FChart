@@ -127,6 +127,7 @@ import _ = require("lodash");
         public Value2Wc: Array<KeyValuePair<string, number>> = new Array();
         public PixelsPerValue: number = 0;
         public StartValue: number = 0;
+        public Type: ChartAxisType = ChartAxisType.XAxis;
 
         public GetValueByKey(key: string): number {
             let value: number = NaN;
@@ -300,11 +301,16 @@ import _ = require("lodash");
 
     export class FChartXAxis extends FChartAxis {
         public Height: number = 0;
-        public Type: XAxisType = XAxisType.Date;
+        public ValueType: XAxisType = XAxisType.Date;
         public TickSelection: XAxisDateTickSelection = XAxisDateTickSelection.Day;
         public CullingTick: boolean = false;
         public CullingTicksCount: number = 0;
         public Title: FChartXAxisTitle = null;
+
+        constructor() {
+            super();
+            this.Type = ChartAxisType.XAxis;
+        }
 
         public Draw(chart: FChart): void {
             // Draw axis line and tick.
@@ -312,7 +318,7 @@ import _ = require("lodash");
             let x = 0;
             let y = this.LineWidth / 2;
             let svg: SVGSVGElement = chart.GetSVGSVGElementByID("svg-xaxis-" + this.ID, true);
-            if (chart.GetDisplayXAxesCount() == 1) {
+            if (chart.GetVisibleXAxesCount() == 1) {
                 svg = chart.GetSVGSVGElementByID("svg-xaxis-bottom", true);
             }
             FChartHelper.SetSVGLineAttributes(xAxisLine, "xaxis-line" + this.ID, x.toString(), y.toString(), svg.clientWidth.toString(), y.toString(), this.LineWidth.toString(), this.LineColor);
@@ -324,7 +330,7 @@ import _ = require("lodash");
                 let obj = this.Value2Wc[i];
                 let value = obj.Key;
                 let wcx = obj.Value;
-                let ix = chart.PlotXStart + chart.m_coeff.ToDvcX(wcx);
+                let ix = chart.XAxisLeftMargin + chart.m_coeff.ToDvcX(wcx);
 
                 let tickLine: SVGLineElement = chart.CreateSVGLineElement();
                 let tickLineId = "xaxis-tick-" + this.ID + "-" + ix.toString();
@@ -379,7 +385,7 @@ import _ = require("lodash");
                 return;
             }
 
-            let nXCount = chart.GetDisplayXAxesCount();
+            let nXCount = chart.GetVisibleXAxesCount();
             let svg: SVGSVGElement = null;
             let yStart: number = 0;
             if (nXCount == 1) {
@@ -422,6 +428,11 @@ import _ = require("lodash");
         private MaxTickLabelWidth: number = 0;
 
         public PlotY: number = 0;
+
+        constructor() {
+            super();
+            this.Type = ChartAxisType.YAxis;
+        }
 
         public Draw(chart: FChart): void {
             // Draw axis line and tick.
@@ -626,10 +637,10 @@ import _ = require("lodash");
                 let data: DataPoint = this.Data[i];
                 let x: number = data.fx;
                 let y: number = data.fy;
-                let ix: number = chart.PlotXStart + chart.m_coeff.ToDvcX(x);
+                let ix: number = chart.m_coeff.ToDvcX(x);
                 let iy: number = chart.m_coeff.ToDvcY(y);
                 let pt: SVGPoint = svgPlot.createSVGPoint();
-                pt.x = ix;
+                pt.x = chart.XAxisLeftMargin + ix;
                 pt.y = iy - yaxis.PlotY;
                 serieLine.points.appendItem(pt);
             }
@@ -643,7 +654,7 @@ import _ = require("lodash");
             }
             for (let i = 0; i < this.Data.length; i++) {
                 let data: DataPoint = this.Data[i];
-                let ix: number = chart.PlotXStart + chart.m_coeff.ToDvcX(data.fx);
+                let ix: number = chart.XAxisLeftMargin + chart.m_coeff.ToDvcX(data.fx);
                 let iy: number = chart.m_coeff.ToDvcY(data.fy);
                 if (data.Show) {
                     // Draw mark.
@@ -661,11 +672,11 @@ import _ = require("lodash");
             this.Data.sort((a, b) => {
                 let value1: number;
                 let value2: number;
-                if (xaxis.Type == XAxisType.Date) {
+                if (xaxis.ValueType == XAxisType.Date) {
                     value1 = (new Date(a.X)).valueOf();
                     value2 = (new Date(b.X)).valueOf();
                 }
-                else if (xaxis.Type == XAxisType.Number) {
+                else if (xaxis.ValueType == XAxisType.Number) {
                     value1 = parseFloat(a.X);
                     value2 = parseFloat(b.X);
                 }
@@ -1664,11 +1675,9 @@ import _ = require("lodash");
                 }
             }
             else if (e.toElement.id == this.ZoomInHolderID) {
-                this.OnZoomIn(e);
                 this.TimerID = setInterval(() => { this.OnZoomIn(null); }, 100);
             }
             else if (e.toElement.id == this.ZoomOutHolderID) {
-                this.OnZoomOut(e);
                 this.TimerID = setInterval(() => { this.OnZoomOut(null); }, 100);
             }
         }
@@ -2735,6 +2744,12 @@ import _ = require("lodash");
         public DrawDataPoint: any = function (data: DataPoint) { }
 
         private PlotPosition: FloatPoint = new FloatPoint(0, 0);
+        public GetPlotX(): number {
+            return this.PlotPosition.X;
+        }
+        public GetPlotY(): number {
+            return this.PlotPosition.Y;
+        }
         private ZoomFactor: number = 1.2;
         private SCALE_ULIMIT: number = 0.002;
         private SCALE_LLIMIT: number = 1;
@@ -2783,10 +2798,6 @@ import _ = require("lodash");
             }
 
             return dMargin;
-        }
-
-        get PlotXStart() {
-            return this.XAxisLeftMargin > 0 ? this.XAxisLeftMargin : 0;
         }
 
         private m_dPlotLeftRange: number = 0;
@@ -3162,8 +3173,8 @@ import _ = require("lodash");
         }
 
         private DrawGridLine(): void {
-            let nXAxesCount: number = this.GetDisplayXAxesCount();
-            let nYAxesCount: number = this.GetDisplayYAxesCount();
+            let nXAxesCount: number = this.GetVisibleXAxesCount();
+            let nYAxesCount: number = this.GetVisibleYAxesCount();
             let svgPlot: SVGSVGElement = this.GetPlotSVG();
             if (FChartHelper.ObjectIsNullOrEmpty(svgPlot)) {
                 return;
@@ -3173,13 +3184,13 @@ import _ = require("lodash");
             let plotHeight: number = svgPlot.clientHeight;
 
             if (this.GridX.Show && nXAxesCount <= 1) {
-                let xaxis: FChartXAxis = this.GetXAxis();
+                let xaxis: FChartXAxis = this.GetUniqueXAxis();
                 if (!FChartHelper.ObjectIsNullOrEmpty(xaxis)) {
                     for (let i = 0; i < xaxis.Value2Wc.length; i++) {
                         let obj: any = xaxis.Value2Wc[i];
                         let key = obj.Key;
                         let value = obj.Value;
-                        let ix = this.PlotXStart + this.m_coeff.ToDvcX(value);
+                        let ix = this.XAxisLeftMargin + this.m_coeff.ToDvcX(value);
                         let y1 = 0;
                         let y2 = plotHeight;
                         let id = xaxis.ID + "-x-gridline-" + i.toString();
@@ -3197,7 +3208,7 @@ import _ = require("lodash");
                     continue;
                 }
 
-                let ix: number = this.PlotXStart + xaxis.GetCoordByValue(gridline.Value);
+                let ix: number = this.XAxisLeftMargin + xaxis.GetCoordByValue(gridline.Value);
                 let y1: number = 0;
                 let y2: number = plotHeight;
                 let line: SVGLineElement = this.CreateSVGLineElement();
@@ -3229,15 +3240,15 @@ import _ = require("lodash");
             }
 
             if (this.GridY.Show && nYAxesCount <= 1) {
-                let yaxis: FChartYAxis = this.GetYAxis();
+                let yaxis: FChartYAxis = this.GetUniqueYAxis();
                 if (!FChartHelper.ObjectIsNullOrEmpty(yaxis)) {
                     for (let i = 0; i < yaxis.Value2Wc.length; i++) {
                         let obj: KeyValuePair<string, number> = yaxis.Value2Wc[i];
                         let key = obj.Key;
                         let value = obj.Value;
                         let iy = this.m_coeff.ToDvcY(value);
-                        let x1 = this.PlotXStart;
-                        let x2 = this.PlotXStart + plotWidth;
+                        let x1 = this.XAxisLeftMargin;
+                        let x2 = plotWidth - this.XAxisRightMargin;
 
                         if (key == "top" || key == "bottom") {
                             continue;
@@ -3257,8 +3268,8 @@ import _ = require("lodash");
                 }
 
                 let iy: number = yaxis.GetCoordByValue(gridline.Value);
-                let x1: number = this.PlotXStart;
-                let x2: number = this.PlotXStart + plotWidth;
+                let x1: number = this.XAxisLeftMargin;
+                let x2: number = plotWidth - this.XAxisRightMargin;
                 let line: SVGLineElement = this.CreateSVGLineElement();
                 let id = yaxis.ID + "-y-extra-gridline-" + i.toString();
                 FChartHelper.SetSVGLineAttributes(line, id, x1.toString(), iy.toString(), x2.toString(), iy.toString(), gridline.LineWidth.toString(), gridline.LineColor);
@@ -3284,7 +3295,7 @@ import _ = require("lodash");
                     textAnchor = "end";
                 }
 
-                lx += this.PlotXStart;
+                lx += this.XAxisLeftMargin;
 
                 let text: SVGTextElement = this.CreateSVGTextElement();
                 let textID = yaxis.ID + "-y-extra-gridline-text-" + i.toString();
@@ -3372,12 +3383,12 @@ import _ = require("lodash");
             return yaxis;
         }
 
-        public GetDisplayXAxesCount(): number {
+        public GetVisibleXAxesCount(): number {
             let nCount = 0;
 
             for (let i = 0; i < this.XAxes.length; i++) {
                 let xaxis = this.XAxes[i];
-                if (xaxis.Show) {
+                if (this.IsAxisVisible(xaxis)) {
                     nCount++;
                 }
             }
@@ -3385,15 +3396,15 @@ import _ = require("lodash");
             return nCount;
         }
 
-        public GetXAxis(): FChartXAxis {
-            let nXCount = this.GetDisplayXAxesCount();
+        public GetUniqueXAxis(): FChartXAxis {
+            let nXCount = this.GetVisibleXAxesCount();
             if (nXCount != 1) {
                 return null;
             }
 
             let xaxis: FChartXAxis = null;
             for (let i = 0; i < this.XAxes.length; i++) {
-                if (this.XAxes[i].Show) {
+                if (this.IsAxisVisible(this.XAxes[i])) {
                     xaxis = this.XAxes[i];
                     break;
                 }
@@ -3402,12 +3413,12 @@ import _ = require("lodash");
             return xaxis;
         }
 
-        public GetDisplayYAxesCount(): number {
+        public GetVisibleYAxesCount(): number {
             let nCount = 0;
 
             for (let i = 0; i < this.YAxes.length; i++) {
-                let yaxis = this.YAxes[i];
-                if (yaxis.Show) {
+                let yaxis: FChartYAxis = this.YAxes[i];
+                if (this.IsAxisVisible(yaxis)) {
                     nCount++;
                 }
             }
@@ -3415,15 +3426,15 @@ import _ = require("lodash");
             return nCount;
         }
 
-        public GetYAxis(): FChartYAxis {
-            let nYCount = this.GetDisplayYAxesCount();
+        public GetUniqueYAxis(): FChartYAxis {
+            let nYCount = this.GetVisibleYAxesCount();
             if (nYCount != 1) {
                 return null;
             }
 
             let yaxis: FChartYAxis = null;
             for (let i = 0; i < this.YAxes.length; i++) {
-                if (this.YAxes[i].Show) {
+                if (this.IsAxisVisible(this.YAxes[i])) {
                     yaxis = this.YAxes[i];
                     break;
                 }
@@ -3432,7 +3443,7 @@ import _ = require("lodash");
             return yaxis;
         }
 
-        public GetVisibleDataSeriesCount(): number {
+        public GetDisplayDataSeriesCount(): number {
             let nCount = 0;
 
             for (let i = 0; i < this.DataSeries.length; i++) {
@@ -3474,14 +3485,6 @@ import _ = require("lodash");
         public GetPlotHeight(): number {
             let svgPlot: SVGSVGElement = this.GetPlotSVG();
             return svgPlot.clientHeight;
-        }
-
-        public GetPlotX(): number {
-            return this.PlotPosition.X;
-        }
-
-        public GetPlotY(): number {
-            return this.PlotPosition.Y;
         }
 
         public GetLegendSVG(): SVGSVGElement {
@@ -3600,13 +3603,13 @@ import _ = require("lodash");
                             let x0 = serie.Data[j - 1].X;
                             let value1;
                             let value0;
-                            if (xaxis.Type == XAxisType.Date) {
+                            if (xaxis.ValueType == XAxisType.Date) {
                                 value1 = (new Date(x1)).valueOf();
                                 value0 = (new Date(x0)).valueOf();
                             }
-                            else if (xaxis.Type == XAxisType.Number) {
-                                value1 = parseInt(x1);
-                                value0 = parseInt(x0);
+                            else if (xaxis.ValueType == XAxisType.Number) {
+                                value1 = parseFloat(x1);
+                                value0 = parseFloat(x0);
                             }
                             dSum += (value1 - value0);
                         }
@@ -3765,7 +3768,7 @@ import _ = require("lodash");
 
         private CalculateXAxesHeight(h: number): number {
             let xAxesHeight: number = 0;
-            let nCount: number = this.GetDisplayXAxesCount();
+            let nCount: number = this.GetVisibleXAxesCount();
 
             if (this.UseFixedXAxesHeight) {
                 this.FixedXAxesHeight = Math.abs(this.FixedXAxesHeight);
@@ -3833,7 +3836,7 @@ import _ = require("lodash");
 
         private CalculateYAxesWidth(w: number): number {
             let yAxesWidth: number = 0;
-            let nCount: number = this.GetDisplayYAxesCount();
+            let nCount: number = this.GetVisibleYAxesCount();
 
             if (this.UseFixedYAxesWidth) {
                 let wYAxes: number = 0;
@@ -3929,7 +3932,7 @@ import _ = require("lodash");
             let dPlotWidth: number = 0;
 
             let yAxesWidth: number = this.CalculateYAxesWidth(this.ChartWidth);
-            let nCountY: number = this.GetDisplayYAxesCount();
+            let nCountY: number = this.GetVisibleYAxesCount();
             let yw: number = (yAxesWidth == 0 || nCountY == 0) ? 0 : yAxesWidth / nCountY;
             for (let i = 0; i < this.YAxes.length; i++) {
                 if (this.YAxes[i].Show) {
@@ -3939,7 +3942,7 @@ import _ = require("lodash");
             }
 
             let xAxesHeight: number = this.CalculateXAxesHeight(this.ChartHeight);
-            let nCountX: number = this.GetDisplayXAxesCount();
+            let nCountX: number = this.GetVisibleXAxesCount();
             let xh: number = (xAxesHeight == 0 || nCountX == 0) ? 0 : xAxesHeight / nCountX;
             for (let i = 0; i < this.XAxes.length; i++) {
                 if (this.XAxes[i].Show) {
@@ -4033,14 +4036,14 @@ import _ = require("lodash");
         }
 
         private CalculatePartsPosition() {
-            let nDisplayXAxesCount: number = this.GetDisplayXAxesCount();
-            let xaxis: FChartXAxis = this.GetXAxis();
+            let nDisplayXAxesCount: number = this.GetVisibleXAxesCount();
+            let xaxis: FChartXAxis = this.GetUniqueXAxis();
 
             let lyaxes: FChartYAxis[] = new Array<FChartYAxis>();
             let ryaxes: FChartYAxis[] = new Array<FChartYAxis>();
             for (let i = 0; i < this.YAxes.length; i++) {
                 let yaxis: FChartYAxis = this.YAxes[i];
-                if (!yaxis.Show) {
+                if (!this.IsAxisVisible(yaxis)) {
                     continue;
                 }
 
@@ -4221,7 +4224,7 @@ import _ = require("lodash");
                 let minY = Number.MAX_VALUE;
                 let maxY = Number.MIN_VALUE;
                 let yaxis: FChartYAxis = this.YAxes[i];
-                if (!this.AxisNeedToCalculateTick(yaxis, ChartAxisType.YAxis)) {
+                if (!this.AxisHasDataSerie(yaxis)) {
                     continue;
                 }
 
@@ -4324,17 +4327,17 @@ import _ = require("lodash");
         private CalculateXAxisTickCoordinate() {
             for (let i = 0; i < this.XAxes.length; i++) {
                 let xaxis: FChartXAxis = this.XAxes[i];
-                if (!this.AxisNeedToCalculateTick(xaxis, ChartAxisType.XAxis)) {
+                if (!this.AxisHasDataSerie(xaxis)) {
                     continue;
                 }
 
                 let minX: any;
                 let maxX: any;
-                if (xaxis.Type == XAxisType.Date) {
+                if (xaxis.ValueType == XAxisType.Date) {
                     minX = new Date("2050-01-01 00:00:00").valueOf();
                     maxX = new Date("1975-01-01 00:00:00").valueOf();
                 }
-                else if (xaxis.Type == XAxisType.Number) {
+                else if (xaxis.ValueType == XAxisType.Number) {
                     minX = Number.MAX_VALUE;
                     maxX = Number.MIN_VALUE;
                 }
@@ -4349,10 +4352,10 @@ import _ = require("lodash");
                     for (let k = 0; k < serie.Data.length; k++) {
                         let xValue: string = serie.Data[k].X;
                         let value;
-                        if (xaxis.Type == XAxisType.Date) {
+                        if (xaxis.ValueType == XAxisType.Date) {
                             value = new Date(xValue).valueOf();
                         }
-                        else if (xaxis.Type == XAxisType.Number) {
+                        else if (xaxis.ValueType == XAxisType.Number) {
                             value = parseFloat(xValue);
                         }
 
@@ -4374,7 +4377,7 @@ import _ = require("lodash");
                 let obj2: DateTicksInfo = null;
 
                 xaxis.Value2Wc = new Array<KeyValuePair<string, number>>();
-                if (xaxis.Type == XAxisType.Number || (xaxis.Type == XAxisType.Date && xaxis.TickSelection == XAxisDateTickSelection.DateAsNumber)) {
+                if (xaxis.ValueType == XAxisType.Number || (xaxis.ValueType == XAxisType.Date && xaxis.TickSelection == XAxisDateTickSelection.DateAsNumber)) {
                     maxAverageDiff = this.GetXAxisAverageDiff(xaxis.ID);
                     let obj: NumberTicksInfo = this.GetXAxisTickCount(xaxis.ID, maxAverageDiff, maxX, minX, this.m_width);
                     xPixelsPerValue = this.m_width / (obj.Ticks * obj.Scale);
@@ -4384,7 +4387,7 @@ import _ = require("lodash");
                     nTicksCount = obj.Ticks;
                     iType = 0;
                 }
-                else if (xaxis.Type == XAxisType.Date) {
+                else if (xaxis.ValueType == XAxisType.Date) {
                     let obj: DateTicksInfo = this.GetXAxisTickCount2(xaxis.ID, maxX, minX, this.m_width);
                     xPixelsPerValue = this.m_width / (obj.Ticks.length);
                     startValue = obj.StartValue;
@@ -4428,11 +4431,11 @@ import _ = require("lodash");
                     let xValue = null;
                     let yValue = null;
                     let dp: DataPoint = this.DataSeries[i].Data[j];
-                    if (xaxis.Type == XAxisType.Date) {
+                    if (xaxis.ValueType == XAxisType.Date) {
                         xValue = (new Date(dp.X)).valueOf();
                     }
-                    else if (xaxis.Type == XAxisType.Number) {
-                        xValue = parseInt(dp.X);
+                    else if (xaxis.ValueType == XAxisType.Number) {
+                        xValue = parseFloat(dp.X);
                     }
                     yValue = dp.Y;
 
@@ -4444,26 +4447,32 @@ import _ = require("lodash");
             }
         }
 
-        private AxisNeedToCalculateTick(axis: FChartAxis, t: ChartAxisType) {
+        private AxisHasDataSerie(axis: FChartAxis) {
             if (FChartHelper.ObjectIsNullOrEmpty(axis)) {
                 return false;
             }
 
-            let bNeedToCalculate: boolean = false;
-
+            let bHas: boolean = false;
             for (let i = 0; i < this.DataSeries.length; i++) {
                 let serie: FChartDataSerie = this.DataSeries[i];
                 if (!serie.Show) {
                     continue;
                 }
-                bNeedToCalculate = t == ChartAxisType.XAxis ? (serie.XAxisID == axis.ID) : (serie.YAxisID == axis.ID);
-                if (bNeedToCalculate) {
+                bHas = axis.Type == ChartAxisType.XAxis ? (serie.XAxisID == axis.ID) : (serie.YAxisID == axis.ID);
+                if (bHas) {
                     break;
                 }
             }
                 
+            return bHas;
+        }
 
-            return bNeedToCalculate;
+        private IsAxisVisible(axis: FChartAxis): boolean {
+            if (FChartHelper.ObjectIsNullOrEmpty(axis)) {
+                return false;
+            }
+
+            return (axis.Show && this.AxisHasDataSerie(axis));
         }
 
         public AppendSVGToContainer(svg: SVGSVGElement): void {
@@ -4513,9 +4522,9 @@ import _ = require("lodash");
             this.m_arrSVG.push(svgPlot);
             this.PlotSVG = svgPlot;
 
-            let nXCount = this.GetDisplayXAxesCount();
+            let nXCount = this.GetVisibleXAxesCount();
             if (nXCount == 1) {
-                let xaxis: FChartXAxis = this.GetXAxis();
+                let xaxis: FChartXAxis = this.GetUniqueXAxis();
                 let svgTop: SVGSVGElement = this.CreateSVG("svg-xaxis-top", "absolute", this.PlotPosition.X.toString(), "0", this.PlotWidth.toString(), (xaxis.Height / 2).toString());
                 divContainer.appendChild(svgTop);
                 this.m_arrSVG.push(svgTop);

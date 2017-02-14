@@ -16,7 +16,7 @@ function DemoChart(): void {
     var xaxis1 = new FChartX.FChartXAxis();
     xaxis1.Show = true;
     xaxis1.ID = "XAxis-1";
-    xaxis1.Type = FChartX.XAxisType.Number;
+    xaxis1.ValueType = FChartX.XAxisType.Number;
     xaxis1.Title = new FChartX.FChartXAxisTitle();
     xaxis1.Title.Show = true;
     xaxis1.Title.FontSize = 11;
@@ -27,7 +27,7 @@ function DemoChart(): void {
     var xaxis2 = new FChartX.FChartXAxis();
     xaxis2.Show = true;
     xaxis2.ID = "XAxis-2";
-    xaxis2.Type = FChartX.XAxisType.Number;
+    xaxis2.ValueType = FChartX.XAxisType.Number;
     xaxis2.Title = new FChartX.FChartXAxisTitle();
     xaxis2.Title.Show = true;
     xaxis2.Title.FontSize = 11;
@@ -122,11 +122,15 @@ function DemoChart(): void {
     var pt5 = new FChartX.DataPoint();
     pt5.X = "77";
     pt5.Y = 720;
+    var pt6 = new FChartX.DataPoint();
+    pt6.X = "330";
+    pt6.Y = 500;
     serie1.Data.push(pt1);
     serie1.Data.push(pt2);
     serie1.Data.push(pt3);
     serie1.Data.push(pt4);
     serie1.Data.push(pt5);
+    serie1.Data.push(pt6);
     chart.DataSeries.push(serie1);
     chart.DataSeries.push(serie2);
 
