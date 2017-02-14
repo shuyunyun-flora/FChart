@@ -71,6 +71,12 @@ define(["require", "exports"], function (require, exports) {
         ChartZoomMode[ChartZoomMode["Center"] = 1] = "Center";
     })(exports.ChartZoomMode || (exports.ChartZoomMode = {}));
     var ChartZoomMode = exports.ChartZoomMode;
+    (function (ChartZoomDirection) {
+        ChartZoomDirection[ChartZoomDirection["XAxis"] = 0] = "XAxis";
+        ChartZoomDirection[ChartZoomDirection["YAxis"] = 1] = "YAxis";
+        ChartZoomDirection[ChartZoomDirection["Both"] = 2] = "Both";
+    })(exports.ChartZoomDirection || (exports.ChartZoomDirection = {}));
+    var ChartZoomDirection = exports.ChartZoomDirection;
     var ChartGraphObject = (function () {
         function ChartGraphObject() {
             this.Key = "";
@@ -2359,6 +2365,7 @@ define(["require", "exports"], function (require, exports) {
             this.Legend = new FChartLegend();
             this.Zoom = 1.0;
             this.ZoomMode = ChartZoomMode.Center;
+            this.ZoomDirection = ChartZoomDirection.Both;
             this.ShowZoomControl = false;
             this.ZoomControl = new FChartZoomControl();
             this.ShowRangeControl = false;
@@ -2625,11 +2632,19 @@ define(["require", "exports"], function (require, exports) {
             var ratio = (this.m_yt - this.m_yb) / (this.m_xr - this.m_xl);
             var regionRatio = (yt - yb) / (xr - xl);
             var newScale = 0;
-            if (regionRatio > ratio) {
-                newScale = this.m_scale * (yt - yb) / (this.m_yt - this.m_yb);
+            if (this.ZoomDirection == ChartZoomDirection.Both) {
+                if (regionRatio > ratio) {
+                    newScale = this.m_scale * (yt - yb) / (this.m_yt - this.m_yb);
+                }
+                else {
+                    newScale = this.m_scale * (xr - xl) / (this.m_xr - this.m_xl);
+                }
             }
-            else {
+            else if (this.ZoomDirection == ChartZoomDirection.XAxis) {
                 newScale = this.m_scale * (xr - xl) / (this.m_xr - this.m_xl);
+            }
+            else if (this.ZoomDirection == ChartZoomDirection.YAxis) {
+                newScale = this.m_scale * (yt - yb) / (this.m_yt - this.m_yb);
             }
             var dx = (this.m_xr - this.m_xl) * newScale / this.m_scale;
             var dy = (this.m_yt - this.m_yb) * newScale / this.m_scale;
@@ -2719,9 +2734,6 @@ define(["require", "exports"], function (require, exports) {
         FChart.prototype.Draw = function (zoom) {
             if (zoom === void 0) { zoom = false; }
             if (zoom) {
-                //this.CalculateXAxisTickCoordinate();
-                //this.CalculateYAxisTickCoordinate();
-                //this.CalculateDataPointCoordinate();
                 for (var i = 0; i < this.XAxesSVGS.length; i++) {
                     this.XAxesSVGS[i].innerHTML = "";
                 }
@@ -3956,8 +3968,6 @@ define(["require", "exports"], function (require, exports) {
             }
         };
         FChart.prototype.SetWindow = function () {
-            //alert(this.m_width.toString() + "     " + this.m_height.toString());
-            //debugger;
             if (this.m_width == 0 || this.m_height == 0) {
                 return;
             }
@@ -3988,8 +3998,23 @@ define(["require", "exports"], function (require, exports) {
                     this.m_yt = this.m_yb + xx2 + xx2;
                     this.m_scale = scale2;
                 }
+                this.m_uxl = this.m_xl;
+                this.m_uxr = this.m_xr;
+                this.m_uyb = this.m_yb;
+                this.m_uyt = this.m_yt;
             }
-            this.m_coeff.SetCoeff(this.m_width / (this.m_xr - this.m_xl), this.m_width * this.m_xl / (this.m_xr - this.m_xl), this.m_height / (this.m_yb - this.m_yt), this.m_height * this.m_yt / (this.m_yb - this.m_yt));
+            this.CalcCoefficient();
+        };
+        FChart.prototype.CalcCoefficient = function () {
+            if (this.ZoomDirection == ChartZoomDirection.XAxis) {
+                this.m_coeff.SetCoeff(this.m_width / (this.m_xr - this.m_xl), this.m_width * this.m_xl / (this.m_xr - this.m_xl), this.m_height / (this.m_uyb - this.m_uyt), this.m_height * this.m_uyt / (this.m_uyb - this.m_uyt));
+            }
+            else if (this.ZoomDirection == ChartZoomDirection.YAxis) {
+                this.m_coeff.SetCoeff(this.m_width / (this.m_uxr - this.m_uxl), this.m_width * this.m_uxl / (this.m_uxr - this.m_uxl), this.m_height / (this.m_yb - this.m_yt), this.m_height * this.m_yt / (this.m_yb - this.m_yt));
+            }
+            else if (this.ZoomDirection == ChartZoomDirection.Both) {
+                this.m_coeff.SetCoeff(this.m_width / (this.m_xr - this.m_xl), this.m_width * this.m_xl / (this.m_xr - this.m_xl), this.m_height / (this.m_yb - this.m_yt), this.m_height * this.m_yt / (this.m_yb - this.m_yt));
+            }
         };
         FChart.prototype.PrepareContainer = function () {
             var _this = this;

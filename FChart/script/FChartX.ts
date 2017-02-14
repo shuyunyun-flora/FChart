@@ -67,6 +67,12 @@
         Center
     }
 
+    export enum ChartZoomDirection {
+        XAxis,
+        YAxis,
+        Both
+    }
+
     class ChartGraphObject {
         public Key: string = "";
         public LineWidth: number = 1;
@@ -2539,6 +2545,7 @@
         public Legend: FChartLegend = new FChartLegend();
         public Zoom: number = 1.0;
         public ZoomMode: ChartZoomMode = ChartZoomMode.Center;
+        public ZoomDirection: ChartZoomDirection = ChartZoomDirection.Both;
         public ShowZoomControl: boolean = false;
         public ZoomControl: FChartZoomControl = new FChartZoomControl();
         public ShowRangeControl: boolean = false;
@@ -2697,6 +2704,11 @@
         private m_miny: number;
         private m_maxy: number;
 
+        private m_uxl: number;
+        private m_uxr: number;
+        private m_uyt: number;
+        private m_uyb: number;
+
         private GetOffsetX(): number {
             let offsetX = 0;
 
@@ -2819,11 +2831,19 @@
             let regionRatio: number = (yt - yb) / (xr - xl);
             let newScale: number = 0;
 
-            if (regionRatio > ratio) {
-                newScale = this.m_scale * (yt - yb) / (this.m_yt - this.m_yb);
+            if (this.ZoomDirection == ChartZoomDirection.Both) {
+                if (regionRatio > ratio) {
+                    newScale = this.m_scale * (yt - yb) / (this.m_yt - this.m_yb);
+                }
+                else {
+                    newScale = this.m_scale * (xr - xl) / (this.m_xr - this.m_xl);
+                }
             }
-            else {
+            else if (this.ZoomDirection == ChartZoomDirection.XAxis) {
                 newScale = this.m_scale * (xr - xl) / (this.m_xr - this.m_xl);
+            }
+            else if (this.ZoomDirection == ChartZoomDirection.YAxis) {
+                newScale = this.m_scale * (yt - yb) / (this.m_yt - this.m_yb);
             }
 
             let dx: number = (this.m_xr - this.m_xl) * newScale / this.m_scale;
@@ -2938,10 +2958,6 @@
 
         private Draw(zoom: boolean = false): void {
             if (zoom) {
-                //this.CalculateXAxisTickCoordinate();
-                //this.CalculateYAxisTickCoordinate();
-                //this.CalculateDataPointCoordinate();
-
                 for (let i = 0; i < this.XAxesSVGS.length; i++) {
                     this.XAxesSVGS[i].innerHTML = "";
                 }
@@ -4374,8 +4390,6 @@
         }
 
         private SetWindow() {
-            //alert(this.m_width.toString() + "     " + this.m_height.toString());
-            //debugger;
             if (this.m_width == 0 || this.m_height == 0) {
                 return;
             }
@@ -4407,10 +4421,28 @@
                     this.m_yt = this.m_yb + xx2 + xx2;
                     this.m_scale = scale2;
                 }
-            }
 
-            this.m_coeff.SetCoeff(this.m_width / (this.m_xr - this.m_xl), this.m_width * this.m_xl / (this.m_xr - this.m_xl),
-                this.m_height / (this.m_yb - this.m_yt), this.m_height * this.m_yt / (this.m_yb - this.m_yt));
+                this.m_uxl = this.m_xl;
+                this.m_uxr = this.m_xr;
+                this.m_uyb = this.m_yb;
+                this.m_uyt = this.m_yt;
+            }
+            this.CalcCoefficient();
+        }
+
+        private CalcCoefficient(): void {
+            if (this.ZoomDirection == ChartZoomDirection.XAxis) {
+                this.m_coeff.SetCoeff(this.m_width / (this.m_xr - this.m_xl), this.m_width * this.m_xl / (this.m_xr - this.m_xl),
+                    this.m_height / (this.m_uyb - this.m_uyt), this.m_height * this.m_uyt / (this.m_uyb - this.m_uyt));
+            }
+            else if (this.ZoomDirection == ChartZoomDirection.YAxis) {
+                this.m_coeff.SetCoeff(this.m_width / (this.m_uxr - this.m_uxl), this.m_width * this.m_uxl / (this.m_uxr - this.m_uxl),
+                    this.m_height / (this.m_yb - this.m_yt), this.m_height * this.m_yt / (this.m_yb - this.m_yt));
+            }
+            else if (this.ZoomDirection == ChartZoomDirection.Both) {
+                this.m_coeff.SetCoeff(this.m_width / (this.m_xr - this.m_xl), this.m_width * this.m_xl / (this.m_xr - this.m_xl),
+                    this.m_height / (this.m_yb - this.m_yt), this.m_height * this.m_yt / (this.m_yb - this.m_yt));
+            }
         }
 
         private PrepareContainer(): void {
