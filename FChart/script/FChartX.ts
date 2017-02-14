@@ -73,6 +73,10 @@
         Both
     }
 
+    export enum FChartEventTypes {
+        ZoomChanged
+    }
+
     class ChartGraphObject {
         public Key: string = "";
         public LineWidth: number = 1;
@@ -1419,6 +1423,22 @@
                 svgZoomControl.appendChild(text);
                 this.LabelHolder = text;
             }
+
+            this.AttachedChart.EventListenerMap.push(new KeyValuePair<FChartEventTypes, any>(FChartEventTypes.ZoomChanged, (e) => { this.OnChartZoomChanged(e); }));
+        }
+
+        private OnChartZoomChanged(zoomValue: number): void {
+            if (FChartHelper.ObjectIsNullOrEmpty(this.LabelHolder)) {
+                return;
+            }
+
+            this.UpdateDraggerData();
+            let dValue: number = FChartHelper.RoundFloatNumber(zoomValue, 3, false);
+            let strValue: string = dValue.toString();
+            if (dValue.toString().length > 6) {
+                strValue = dValue.toFixed(3);
+            }
+            this.LabelHolder.textContent = strValue;
         }
 
         private Step: number = 10;
@@ -1454,20 +1474,6 @@
                     delta = delta > right ? right : delta;
                     this.DraggerX += delta;
                 }
-
-                let bx1: number = this.DraggerX - this.DraggerScale;
-                let by1: number = this.DraggerY - this.CircleRadius;
-                let bx2: number = this.DraggerX + this.DraggerScale;
-                let by2: number = this.DraggerY - this.CircleRadius;
-                let bx3: number = this.DraggerX + this.DraggerScale;
-                let by3: number = this.DraggerY + this.CircleRadius;
-                let bx4: number = this.DraggerX - this.DraggerScale;
-                let by4: number = this.DraggerY + this.CircleRadius;
-                let d: string = "M" + bx1.toString() + " " + by1.toString() + " " +
-                    "L" + bx2.toString() + " " + by2.toString() + " " +
-                    "L" + bx3.toString() + " " + by3.toString() + " " +
-                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
-                this.DraggerHolder.setAttribute("d", d);
             }
             else {
                 let bottom: number = 0;
@@ -1496,29 +1502,9 @@
                     delta = delta > top ? top : delta;
                     this.DraggerY -= delta;
                 }
-
-                let bx1: number = this.DraggerX - this.CircleRadius;
-                let by1: number = this.DraggerY - this.DraggerScale;
-                let bx2: number = this.DraggerX + this.CircleRadius;
-                let by2: number = this.DraggerY - this.DraggerScale;
-                let bx3: number = this.DraggerX + this.CircleRadius;
-                let by3: number = this.DraggerY + this.DraggerScale;
-                let bx4: number = this.DraggerX - this.CircleRadius;
-                let by4: number = this.DraggerY + this.DraggerScale;
-                let d: string = "M" + bx1.toString() + " " + by1.toString() + " " +
-                    "L" + bx2.toString() + " " + by2.toString() + " " +
-                    "L" + bx3.toString() + " " + by3.toString() + " " +
-                    "L" + bx4.toString() + " " + by4.toString() + " " + "Z";
-                this.DraggerHolder.setAttribute("d", d);
             }
 
             this.AttachedChart.ZoomToScale(1 / this.ZoomValue);
-            let dValue: number = FChartHelper.RoundFloatNumber(this.ZoomValue, 3, false);
-            let strValue: string = dValue.toString();
-            if (dValue.toString().length > 6) {
-                strValue = dValue.toFixed(3);
-            }
-            this.LabelHolder.textContent = strValue;
 
             return true;
         }
@@ -1799,6 +1785,10 @@
             this.DrawBar();
             this.DrawDragger();
             this.DrawMask();   
+
+            this.CenterMask.ondblclick = (e) => {
+                this.AttachedChart.GetPlotSVG().ondblclick(e);
+            }
         }
 
         private DrawCorner(): void {
@@ -2553,6 +2543,8 @@
         public AspectRatio: number = 1.0;
         public KeepAspectRatio: boolean = false;            // If false, ignore AspectRatio, If true, consider AspectRatio.
 
+        public EventListenerMap: Array<KeyValuePair<FChartEventTypes, any>> = new Array<KeyValuePair<FChartEventTypes, any>>();
+
         public SVGMeasure: SVGSVGElement = null;
         private m_arrSVG: SVGSVGElement[] = new Array<SVGSVGElement>();
         private XAxesSVGS: Array<SVGSVGElement> = new Array<SVGSVGElement>();
@@ -2762,6 +2754,7 @@
 
             this.SetWindow();
             this.Draw(true);
+            this.FireZoomChanged();
         }
 
         public ZoomOut(): void {
@@ -2779,6 +2772,7 @@
 
             this.SetWindow();
             this.Draw(true);
+            this.FireZoomChanged();
         }
 
         public ZoomToScale(dNewScale: number): void {
@@ -2807,6 +2801,7 @@
 
             this.SetWindow();
             this.Draw(true);
+            this.FireZoomChanged();
         }
 
         public ZoomToFull(): void {
@@ -2857,6 +2852,18 @@
 
             this.SetWindow();
             this.Draw(true);
+            this.FireZoomChanged();
+        }
+
+        public FireZoomChanged(): void {
+            for (let i = 0; i < this.EventListenerMap.length; i++) {
+                let kvp: KeyValuePair<FChartEventTypes, any> = this.EventListenerMap[i];
+                if (kvp.Key == FChartEventTypes.ZoomChanged) {
+                    if (!FChartHelper.ObjectIsNullOrEmpty(kvp.Value)) {
+                        kvp.Value(this.ZoomLevel);
+                    }
+                }
+            }
         }
 
         public Container: HTMLDivElement = null;
@@ -4495,6 +4502,7 @@
             this.m_dXAxisRightMargin = this.DEFAULT_XAXIS_RIGHT_MARGIN;
             this.PlotLeftRange = 0;
             this.PlotRightRange = 1;
+            this.EventListenerMap = new Array<KeyValuePair<FChartEventTypes, any>>();
         }
 
         private SetCoordinate() {
@@ -4522,6 +4530,9 @@
             this.CalculateDataPointCoordinate();
 
             this.GenerateSVGParts();
+            this.PlotSVG.ondblclick = (e) => {
+                this.ZoomToFull();
+            }
 
             for (let i = 0; i < this.m_arrSVG.length; i++) {
                 this.m_arrSVG[i].onzoom = (e) => { e.cancelBubble = true; alert("svg zoom"); }
