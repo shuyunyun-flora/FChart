@@ -1,4 +1,6 @@
 ﻿/// <reference path="..\typings\jquery.d.ts"/>
+/// <refreence path="..\typings\lodash.d.ts"/>
+import _ = require("lodash");
 
 //export module FChartX {
     export enum LineCapStyle {
@@ -309,9 +311,9 @@
             let xAxisLine: SVGLineElement = chart.CreateSVGLineElement();
             let x = 0;
             let y = this.LineWidth / 2;
-            let svg: SVGSVGElement = chart.GetSVGSVGElementByID("svg-xaxis-" + this.ID);
+            let svg: SVGSVGElement = chart.GetSVGSVGElementByID("svg-xaxis-" + this.ID, true);
             if (chart.GetDisplayXAxesCount() == 1) {
-                svg = chart.GetSVGSVGElementByID("svg-xaxis-bottom");
+                svg = chart.GetSVGSVGElementByID("svg-xaxis-bottom", true);
             }
             FChartHelper.SetSVGLineAttributes(xAxisLine, "xaxis-line" + this.ID, x.toString(), y.toString(), svg.clientWidth.toString(), y.toString(), this.LineWidth.toString(), this.LineColor);
             svg.appendChild(xAxisLine);
@@ -381,11 +383,11 @@
             let svg: SVGSVGElement = null;
             let yStart: number = 0;
             if (nXCount == 1) {
-                svg = chart.GetSVGSVGElementByID("svg-xaxis-top");
+                svg = chart.GetSVGSVGElementByID("svg-xaxis-top", true);
                 yStart = this.Height / 4.0;
             }
             else {
-                svg = chart.GetSVGSVGElementByID("svg-xaxis-" + this.ID);
+                svg = chart.GetSVGSVGElementByID("svg-xaxis-" + this.ID, true);
             }
 
             if (FChartHelper.ObjectIsNullOrEmpty(svg)) {
@@ -423,7 +425,7 @@
 
         public Draw(chart: FChart): void {
             // Draw axis line and tick.
-            let svg = chart.GetSVGSVGElementByID("svg-yaxis-" + this.ID);
+            let svg = chart.GetSVGSVGElementByID("svg-yaxis-" + this.ID, true);
             let regionWidth = svg.clientWidth;
             let regionHeight = svg.clientHeight;
             let x:number = regionWidth - this.LineWidth / 2;
@@ -540,7 +542,7 @@
                 return;
             }
 
-            let svg: SVGSVGElement = chart.GetSVGSVGElementByID("svg-yaxis-" + this.ID);
+            let svg: SVGSVGElement = chart.GetSVGSVGElementByID("svg-yaxis-" + this.ID, true);
             if (FChartHelper.ObjectIsNullOrEmpty(svg)) {
                 return;
             }
@@ -1071,7 +1073,7 @@
                 return;
             }
 
-            let svgLegend: SVGSVGElement = chart.GetSVGSVGElementByID("svg-legend");
+            let svgLegend: SVGSVGElement = chart.GetSVGSVGElementByID("svg-legend", true);
             if (FChartHelper.ObjectIsNullOrEmpty(svgLegend)) {
                 return;
             }
@@ -1300,9 +1302,6 @@
                 let cy1: number = my + 2 * r - r;
                 let circle1: SVGCircleElement = chart.CreateSVGCircleElement();
                 FChartHelper.SetSVGCircleAttributes(circle1, this.ZoomInHolderID, cx1.toString(), cy1.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
-                circle1.addEventListener("click", (e) => {
-                    this.OnZoomIn(e);
-                }, true);
 
                 let ix1: number = cx1;
                 let iy1: number = my;
@@ -1325,9 +1324,6 @@
                 let cy2: number = my + 2 * r + hb + r;
                 let circle2: SVGCircleElement = chart.CreateSVGCircleElement();
                 FChartHelper.SetSVGCircleAttributes(circle2, this.ZoomOutHolderID, cx2.toString(), cy2.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
-                circle2.addEventListener("click", (e) => {
-                    this.OnZoomOut(e);
-                }, true);
 
                 iy1 = my + 2 * r + hb + r;
                 iy2 = iy1;
@@ -1385,9 +1381,6 @@
                 let cy1: number = my + twothOfH + r;
                 let circle1: SVGCircleElement = chart.CreateSVGCircleElement();
                 FChartHelper.SetSVGCircleAttributes(circle1, this.ZoomInHolderID, cx1.toString(), cy1.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
-                circle1.addEventListener("click", (e) => {
-                    this.OnZoomIn(e);
-                }, true);
 
                 let ix1: number = mx;
                 let iy1: number = my + twothOfH + r;
@@ -1410,9 +1403,6 @@
                 let cy2: number = my + twothOfH + r;
                 let circle2: SVGCircleElement = chart.CreateSVGCircleElement();
                 FChartHelper.SetSVGCircleAttributes(circle2, this.ZoomOutHolderID, cx2.toString(), cy2.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
-                circle2.addEventListener("click", (e) => {
-                    this.OnZoomOut(e);
-                }, true);
 
                 ix1 = mx + 2 * r + wb + r;
                 ix2 = ix1;
@@ -1453,6 +1443,8 @@
                 this.LabelHolder = text;
             }
 
+            this.ZoomInHolder.addEventListener("mouseout", (e) => { this.ClearTimer(); });
+            this.ZoomOutHolder.addEventListener("mouseout", (e) => { this.ClearTimer(); });
             this.AttachedChart.EventListenerMap.push(new KeyValuePair<FChartEventTypes, any>(FChartEventTypes.ZoomChanged, (e) => { this.OnChartZoomChanged(e); }));
         }
 
@@ -1649,6 +1641,14 @@
             return zoomValue;
         }
 
+        private TimerID: number = -1;
+        private ClearTimer(): void {
+            if (this.TimerID != -1) {
+                clearInterval(this.TimerID);
+                this.TimerID = -1;
+            }
+        }
+
         public OnMouseDown(e: MouseEvent): void {
             if (FChartHelper.ObjectIsNullOrEmpty(e) || FChartHelper.ObjectIsNullOrEmpty(e.toElement)) {
                 return;
@@ -1663,6 +1663,14 @@
                     this.DraggingStartPosition = e.clientY;
                 }
             }
+            else if (e.toElement.id == this.ZoomInHolderID) {
+                this.OnZoomIn(e);
+                this.TimerID = setInterval(() => { this.OnZoomIn(null); }, 100);
+            }
+            else if (e.toElement.id == this.ZoomOutHolderID) {
+                this.OnZoomOut(e);
+                this.TimerID = setInterval(() => { this.OnZoomOut(null); }, 100);
+            }
         }
 
         public OnMouseUp(e: MouseEvent): void {
@@ -1671,6 +1679,8 @@
                 this.Dragging = false;
                 this.DraggingStartPosition = 0;
             }
+
+            this.ClearTimer();
         }
 
         public OnMouseMove(e: MouseEvent): void {
@@ -1879,7 +1889,7 @@
             let largeArc: number = 0;
             let xAxisRotation: number = 0;
             let sweep: number = 1;
-            let svgCorner: SVGSVGElement = this.AttachedChart.CreateSVG(id, "absolute", x.toString(), y.toString(), w.toString(), h.toString());
+            let svgCorner: SVGSVGElement = this.AttachedChart.CreateSVG(id, "absolute", x.toString(), y.toString(), w.toString(), h.toString(), false);
             this.AttachedChart.AppendSVGToContainer(svgCorner);
             let fillColor: string = "lightgray";
             let x1: number = (dock == RangeControlCornerDock.LeftTop || dock == RangeControlCornerDock.RightTop) ? 0 : w;
@@ -1938,7 +1948,7 @@
             w = (dock == RangeControlBarDock.Left || dock == RangeControlBarDock.Right) ? this.VerticalBarWidth : this.HorizontalBarWidth;
             h = (dock == RangeControlBarDock.Left || dock == RangeControlBarDock.Right) ? this.VerticalBarHeight : this.HorizontalBarHeight;
             w = w > 0 ? w : 0;
-            let svgBar: SVGSVGElement = this.AttachedChart.CreateSVG(id, "absolute", lx.toString(), ly.toString(), w.toString(), h.toString());
+            let svgBar: SVGSVGElement = this.AttachedChart.CreateSVG(id, "absolute", lx.toString(), ly.toString(), w.toString(), h.toString(), false);
             this.AttachedChart.AppendSVGToContainer(svgBar);
             svgBar.style.setProperty("background-color", "lightgray");
 
@@ -2019,7 +2029,7 @@
         }
 
         private DrawMaskGraph(id: string, x: number, y: number, w: number, h: number, dock: RangeControlMaskDock): void {
-            let mask: SVGSVGElement = this.AttachedChart.CreateSVG(id, "absolute", x.toString(), y.toString(), w.toString(), h.toString());
+            let mask: SVGSVGElement = this.AttachedChart.CreateSVG(id, "absolute", x.toString(), y.toString(), w.toString(), h.toString(), false);
             mask.style.setProperty("background-color", "whitesmoke");
             mask.style.setProperty("opacity", "0.5");
             this.AttachedChart.AppendSVGToContainer(mask);
@@ -2612,22 +2622,27 @@
         public set ParentChart(value: FChart) {
             this.m_chartParent = value;
             if (!FChartHelper.ObjectIsNullOrEmpty(this.ParentChart)) {
-                this.ParentChart.XAxes = $.extend(true, {}, { arr: this.XAxes }).arr as Array<FChartXAxis>;
-                this.ParentChart.YAxes = $.extend(true, {}, { arr: this.YAxes }).arr as Array<FChartYAxis>;
-                this.ParentChart.DataSeries = $.extend(true, {}, { arr: this.DataSeries }).arr as Array<FChartDataSerie>;
-                //for (let i = 0; i < this.ParentChart.XAxes.length; i++) {
-                //    this.ParentChart.XAxes[i].Show = false;
-                //}
-                //for (let i = 0; i < this.ParentChart.YAxes.length; i++) {
-                //    this.ParentChart.YAxes[i].Show = false;
-                //}
-                //this.ParentChart.ShowRangeControl = true;
-                //this.ParentChart.ShowZoomControl = false;
-                //this.ParentChart.Legend.Show = false;
+                this.ParentChart.XAxes = _.cloneDeep(this.XAxes);
+                this.ParentChart.YAxes = _.cloneDeep(this.YAxes);
+                this.ParentChart.DataSeries = _.cloneDeep(this.DataSeries);
 
-                this.ParentChart.EventListenerMap.push(new KeyValuePair<FChartEventTypes, any>(FChartEventTypes.RangeChanged, (leftRange, rightRange) => {
-                    this.MonitorRange(leftRange, rightRange);
-                }));
+                for (let i = 0; i < this.ParentChart.XAxes.length; i++) {
+                    this.ParentChart.XAxes[i].Show = false;
+                }
+                for (let i = 0; i < this.ParentChart.YAxes.length; i++) {
+                    this.ParentChart.YAxes[i].Show = false;
+                }
+                this.ParentChart.ShowRangeControl = true;
+                this.ParentChart.ShowZoomControl = false;
+                this.ParentChart.Legend.Show = false;
+
+                if (!FChartHelper.ObjectIsNullOrEmpty(this.ParentChart)) {
+                    this.ParentChart.EventListenerMap.push(new KeyValuePair<FChartEventTypes, any>(FChartEventTypes.RangeChanged, (leftRange, rightRange) => {
+                        this.MonitorRange(leftRange, rightRange);
+                    }));
+                }
+
+                this.ParentChart.ChildChart = this;
             }
         }
 
@@ -2780,6 +2795,7 @@
         }
         public set PlotLeftRange(value: number) {
             this.m_dPlotLeftRange = value;
+            this.FireRangeChanged();
         }
         public m_dPlotRightRange: number = 1;
         public get PlotRightRange(): number {
@@ -2787,6 +2803,7 @@
         }
         public set PlotRightRange(value: number) {
             this.m_dPlotRightRange = value;
+            this.FireRangeChanged();
         }
 
         public m_coeff: FChartCoeff = new FChartCoeff();
@@ -3041,6 +3058,18 @@
 
             for (let i = 0; i < this.DataSeries.length; i++) {
                 this.DataSeries[i].AttachedChart = this;
+            }
+            let rangeChangedHandler: any = null;
+            for (let i = 0; i < this.EventListenerMap.length; i++) {
+                let kvp: KeyValuePair<FChartEventTypes, any> = this.EventListenerMap[i];
+                if (kvp.Key == FChartEventTypes.RangeChanged) {
+                    rangeChangedHandler = kvp.Value;
+                    break;
+                }
+            }
+            this.EventListenerMap = new Array<KeyValuePair<FChartEventTypes, any>>();
+            if (!FChartHelper.ObjectIsNullOrEmpty(this.ChildChart) && !FChartHelper.ObjectIsNullOrEmpty(rangeChangedHandler)) {
+                this.EventListenerMap.push(new KeyValuePair<FChartEventTypes, any>(FChartEventTypes.RangeChanged, rangeChangedHandler));
             }
 
             this.PrepareContainer();
@@ -3416,8 +3445,12 @@
             return nCount;
         }
 
-        public GetSVGSVGElementByID(id: string): SVGSVGElement {
+        public GetSVGSVGElementByID(id: string, bNeedIdentify: boolean = false): SVGSVGElement {
             let svg: SVGSVGElement = null;
+
+            if (bNeedIdentify) {
+                id = this.IdentifyID(id);
+            }
 
             for (let i = 0; i < this.m_arrSVG.length; i++) {
                 if (this.m_arrSVG[i].id == id) {
@@ -3454,7 +3487,7 @@
         public GetLegendSVG(): SVGSVGElement {
             let legendID = "svg-legend";
 
-            return this.GetSVGSVGElementByID(legendID);
+            return this.GetSVGSVGElementByID(legendID, true);
         }
 
         private GetYAxisAverageDiff(YAxisID: string): number {
@@ -4450,9 +4483,9 @@
             svg = null;
         }
 
-        public CreateSVG(id: string, position: string, left: string, top: string, width: string, height: string): SVGSVGElement {
+        public CreateSVG(id: string, position: string, left: string, top: string, width: string, height: string, bNeedIdentifyID: boolean = true): SVGSVGElement {
             let svg: SVGSVGElement = document.createElementNS("http://www.w3.org/2000/svg", "svg") as SVGSVGElement;
-            id = this.IdentifyID(id);
+            id = bNeedIdentifyID ? this.IdentifyID(id) : id;
             svg.setAttribute("id", id);
             svg.style.setProperty("position", position);
             svg.style.setProperty("top", top);
@@ -4646,7 +4679,6 @@
             this.m_dXAxisRightMargin = this.DEFAULT_XAXIS_RIGHT_MARGIN;
             this.PlotLeftRange = 0;
             this.PlotRightRange = 1;
-            this.EventListenerMap = new Array<KeyValuePair<FChartEventTypes, any>>();
         }
 
         private SetCoordinate() {
@@ -4675,52 +4707,67 @@
 
             this.GenerateSVGParts();
             this.PlotSVG.ondblclick = (e) => {
-                this.ZoomToFull();
+                if (this.ShowZoomControl) {
+                    this.ZoomToFull();
+                }
             }
 
             for (let i = 0; i < this.m_arrSVG.length; i++) {
                 this.m_arrSVG[i].onzoom = (e) => { e.cancelBubble = true; alert("svg zoom"); }
             }
 
-            document.onmousedown = null;
-            document.onmousemove = null;
-            document.onmouseup = null;
-            document.onmousedown = (e) => {
-                this.OnMouseDown(e);
-                if (this.ShowZoomControl) {
-                    this.ZoomControl.OnMouseDown(e);
-                }
-                if (this.ShowRangeControl) {
-                    this.RangeControl.OnMouseDown(e);
-                }
-            };
-            document.onmousemove = (e) => {
-                this.OnMouseMove(e);
-                if (this.ShowZoomControl) {
-                    this.ZoomControl.OnMouseMove(e);
-                }
-                if (this.ShowRangeControl) {
-                    this.RangeControl.OnMouseMove(e);
-                }
+            document.removeEventListener("mousedown", this.ChartMouseDown, false);
+            document.addEventListener("mousedown", this.ChartMouseDown, false);
+            document.removeEventListener("mousemove", this.ChartMouseMove, false);
+            document.addEventListener("mousemove", this.ChartMouseMove, false);
+            document.removeEventListener("mouseup", this.ChartMouseUp, false);
+            document.addEventListener("mouseup", this.ChartMouseUp, false);
+            document.removeEventListener("mouseover", this.ChartMouseOver, false);
+            document.addEventListener("mouseover", this.ChartMouseOver, false);
+            document.removeEventListener("mouseout", this.ChartMouseOut, false);
+            document.addEventListener("mouseout", this.ChartMouseOut, false);
+            document.removeEventListener("mousewheel", this.ChartMouseWheel, false);
+            document.addEventListener("mousewheel", this.ChartMouseWheel, false);
+        }
+
+        private ChartMouseDown: any = (e) => {
+            this.OnMouseDown(e);
+            if (this.ShowZoomControl) {
+                this.ZoomControl.OnMouseDown(e);
             }
-            document.onmouseup = (e) => {
-                this.OnMouseUp(e);
-                if (this.ShowZoomControl) {
-                    this.ZoomControl.OnMouseUp(e);
-                }
-                if (this.ShowRangeControl) {
-                    this.RangeControl.OnMouseUp(e);
-                }
+            if (this.ShowRangeControl) {
+                this.RangeControl.OnMouseDown(e);
             }
-            document.onmouseover = (e) => {
-                this.OnMouseOver(e);
+        };
+
+        private ChartMouseMove: any = (e) => {
+            this.OnMouseMove(e);
+            if (this.ShowZoomControl) {
+                this.ZoomControl.OnMouseMove(e);
             }
-            document.onmouseout = (e) => {
-                this.OnMouseOut(e);
+            if (this.ShowRangeControl) {
+                this.RangeControl.OnMouseMove(e);
             }
-            document.onmousewheel = (e) => {
-                this.OnMouseWheel(e);
+        }
+
+        private ChartMouseUp: any = (e) => {
+            this.OnMouseUp(e);
+            if (this.ShowZoomControl) {
+                this.ZoomControl.OnMouseUp(e);
             }
+            if (this.ShowRangeControl) {
+                this.RangeControl.OnMouseUp(e);
+            }
+        }
+
+        private ChartMouseOver: any = (e) => {
+            this.OnMouseOver(e);
+        }
+        private ChartMouseOut: any = (e) => {
+            this.OnMouseOut(e);
+        }
+        private ChartMouseWheel: any = (e) => {
+            this.OnMouseWheel(e);
         }
 
         // Resize

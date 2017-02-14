@@ -6,6 +6,7 @@ requirejs.config({
         "spectrum": "lib/jquery/spectrum/spectrum",
         "datetimepicker": "lib/jquery/jquery.datetimepicker",
         "jquery-mousewheel": "lib/jquery/jquery-mousewheel",
+        "lodash": "lib/lodash",
         "app": "script/app"
     }
 });

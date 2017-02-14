@@ -1,4 +1,5 @@
 ﻿import $ = require("jquery");
+import _ = require("lodash");
 import * as FChartX from "script/FChartX";
 
 $(document).ready(function () {
@@ -13,7 +14,7 @@ function DemoChart(): void {
     chart.FixedXAxesHeight = 0.3;
 
     var xaxis1 = new FChartX.FChartXAxis();
-    xaxis1.Show = false;
+    xaxis1.Show = true;
     xaxis1.ID = "XAxis-1";
     xaxis1.Type = FChartX.XAxisType.Number;
     xaxis1.Title = new FChartX.FChartXAxisTitle();
@@ -24,7 +25,7 @@ function DemoChart(): void {
     chart.XAxes.push(xaxis1);
 
     var xaxis2 = new FChartX.FChartXAxis();
-    xaxis2.Show = false;
+    xaxis2.Show = true;
     xaxis2.ID = "XAxis-2";
     xaxis2.Type = FChartX.XAxisType.Number;
     xaxis2.Title = new FChartX.FChartXAxisTitle();
@@ -35,7 +36,7 @@ function DemoChart(): void {
     chart.XAxes.push(xaxis2);
 
     var yaxis1 = new FChartX.FChartYAxis();
-    yaxis1.Show = false;
+    yaxis1.Show = true;
     yaxis1.ID = "YAxis-1";
     yaxis1.Order = 1;
     yaxis1.Layout = FChartX.YAxisLayout.Left;
@@ -46,7 +47,7 @@ function DemoChart(): void {
     yaxis1.Title.Label = "Y axis Title 1";
     chart.YAxes.push(yaxis1);
     var yaxis2 = new FChartX.FChartYAxis();
-    yaxis2.Show = false;
+    yaxis2.Show = true;
     yaxis2.ID = "YAxis-2";
     yaxis2.Order = 2;
     yaxis2.Layout = FChartX.YAxisLayout.Right;
@@ -132,7 +133,8 @@ function DemoChart(): void {
     let chart2: FChartX.FChart = new FChartX.FChart();
     chart2.BindTo = "divDemoChart2";
 
-    //chart.ParentChart = chart2;
+    chart.ParentChart = chart2;
+
     chart.Render();
-    //chart2.Render();
+    chart2.Render();
 }
