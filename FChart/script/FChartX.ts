@@ -4679,6 +4679,8 @@ import _ = require("lodash");
             this.m_dXAxisRightMargin = this.DEFAULT_XAXIS_RIGHT_MARGIN;
             this.PlotLeftRange = 0;
             this.PlotRightRange = 1;
+            this.m_scale = 0;
+            this.m_oldscale = 0;
         }
 
         private SetCoordinate() {
