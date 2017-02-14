@@ -7,13 +7,13 @@ $(document).ready(function () {
 
 function DemoChart(): void {
     var chart = new FChartX.FChart();
-    chart.BindTo = "divDemoChart";
+    chart.BindTo = "divDemoChart1";
     chart.UseFixedXAxesHeight = true;
     chart.FixedXAxesLengthType = FChartX.LengthType.Percentage;
     chart.FixedXAxesHeight = 0.3;
 
     var xaxis1 = new FChartX.FChartXAxis();
-    xaxis1.Show = true;
+    xaxis1.Show = false;
     xaxis1.ID = "XAxis-1";
     xaxis1.Type = FChartX.XAxisType.Number;
     xaxis1.Title = new FChartX.FChartXAxisTitle();
@@ -24,7 +24,7 @@ function DemoChart(): void {
     chart.XAxes.push(xaxis1);
 
     var xaxis2 = new FChartX.FChartXAxis();
-    xaxis2.Show = true;
+    xaxis2.Show = false;
     xaxis2.ID = "XAxis-2";
     xaxis2.Type = FChartX.XAxisType.Number;
     xaxis2.Title = new FChartX.FChartXAxisTitle();
@@ -35,7 +35,7 @@ function DemoChart(): void {
     chart.XAxes.push(xaxis2);
 
     var yaxis1 = new FChartX.FChartYAxis();
-    yaxis1.Show = true;
+    yaxis1.Show = false;
     yaxis1.ID = "YAxis-1";
     yaxis1.Order = 1;
     yaxis1.Layout = FChartX.YAxisLayout.Left;
@@ -46,7 +46,7 @@ function DemoChart(): void {
     yaxis1.Title.Label = "Y axis Title 1";
     chart.YAxes.push(yaxis1);
     var yaxis2 = new FChartX.FChartYAxis();
-    yaxis2.Show = true;
+    yaxis2.Show = false;
     yaxis2.ID = "YAxis-2";
     yaxis2.Order = 2;
     yaxis2.Layout = FChartX.YAxisLayout.Right;
@@ -66,7 +66,7 @@ function DemoChart(): void {
     chart.ZoomControl.VerticalAlignment = FChartX.VerticalAlignment.Top;
     //chart.ZoomControl.Layout = FChartX.ZoomControlLayout.Top;
     //chart.ZoomControl.HorizontalAlignment = FChartX.HorizontalAlignment.Left;
-    chart.ShowRangeControl = true;
+    chart.ShowRangeControl = false;
 
     var serie1 = new FChartX.FChartDataSerie();
     serie1.XAxisID = xaxis1.ID;
@@ -128,5 +128,11 @@ function DemoChart(): void {
     serie1.Data.push(pt5);
     chart.DataSeries.push(serie1);
     chart.DataSeries.push(serie2);
+
+    let chart2: FChartX.FChart = new FChartX.FChart();
+    chart2.BindTo = "divDemoChart2";
+
+    //chart.ParentChart = chart2;
     chart.Render();
+    //chart2.Render();
 }
