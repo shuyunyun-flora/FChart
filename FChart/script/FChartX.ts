@@ -4730,7 +4730,9 @@ import _ = require("lodash");
             document.addEventListener("mousewheel", this.ChartMouseWheel, false);
         }
 
-        private ChartMouseDown: any = (e) => {
+        private ChartMouseDown: any = (e: MouseEvent) => {
+            e.preventDefault();
+
             this.OnMouseDown(e);
             if (this.ShowZoomControl) {
                 this.ZoomControl.OnMouseDown(e);
@@ -4740,7 +4742,9 @@ import _ = require("lodash");
             }
         };
 
-        private ChartMouseMove: any = (e) => {
+        private ChartMouseMove: any = (e: MouseEvent) => {
+            e.preventDefault();
+
             this.OnMouseMove(e);
             if (this.ShowZoomControl) {
                 this.ZoomControl.OnMouseMove(e);
@@ -4750,7 +4754,9 @@ import _ = require("lodash");
             }
         }
 
-        private ChartMouseUp: any = (e) => {
+        private ChartMouseUp: any = (e: MouseEvent) => {
+            e.preventDefault();
+
             this.OnMouseUp(e);
             if (this.ShowZoomControl) {
                 this.ZoomControl.OnMouseUp(e);
@@ -4760,13 +4766,19 @@ import _ = require("lodash");
             }
         }
 
-        private ChartMouseOver: any = (e) => {
+        private ChartMouseOver: any = (e: MouseEvent) => {
+            e.preventDefault();
+
             this.OnMouseOver(e);
         }
-        private ChartMouseOut: any = (e) => {
+        private ChartMouseOut: any = (e: MouseEvent) => {
+            e.preventDefault();
+
             this.OnMouseOut(e);
         }
-        private ChartMouseWheel: any = (e) => {
+        private ChartMouseWheel: any = (e: MouseEvent) => {
+            e.preventDefault();
+
             this.OnMouseWheel(e);
         }
 

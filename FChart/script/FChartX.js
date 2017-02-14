@@ -2477,6 +2477,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.IsWindowZooming = false;
             this.WindowDevicePixelRatio = 0;
             this.ChartMouseDown = function (e) {
+                e.preventDefault();
                 _this.OnMouseDown(e);
                 if (_this.ShowZoomControl) {
                     _this.ZoomControl.OnMouseDown(e);
@@ -2486,6 +2487,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 }
             };
             this.ChartMouseMove = function (e) {
+                e.preventDefault();
                 _this.OnMouseMove(e);
                 if (_this.ShowZoomControl) {
                     _this.ZoomControl.OnMouseMove(e);
@@ -2495,6 +2497,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 }
             };
             this.ChartMouseUp = function (e) {
+                e.preventDefault();
                 _this.OnMouseUp(e);
                 if (_this.ShowZoomControl) {
                     _this.ZoomControl.OnMouseUp(e);
@@ -2504,12 +2507,15 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 }
             };
             this.ChartMouseOver = function (e) {
+                e.preventDefault();
                 _this.OnMouseOver(e);
             };
             this.ChartMouseOut = function (e) {
+                e.preventDefault();
                 _this.OnMouseOut(e);
             };
             this.ChartMouseWheel = function (e) {
+                e.preventDefault();
                 _this.OnMouseWheel(e);
             };
         }
