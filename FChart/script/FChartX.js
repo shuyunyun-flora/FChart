@@ -4282,8 +4282,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.m_dXAxisRightMargin = this.DEFAULT_XAXIS_RIGHT_MARGIN;
             this.PlotLeftRange = 0;
             this.PlotRightRange = 1;
-            this.m_scale = 0;
-            this.m_oldscale = 0;
         };
         FChart.prototype.SetCoordinate = function () {
             var _this = this;
@@ -4340,8 +4338,11 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             }
             this.ContainerWidth = sz.Width;
             this.ContainerHeight = sz.Height;
+            this.m_oldscale = this.m_scale;
+            this.m_scale = this.SCALE_LLIMIT;
             this.SetCoordinate();
             this.Draw();
+            this.ZoomToScale(this.m_oldscale);
         };
         // Mouse events
         FChart.prototype.OnMouseOver = function (e) {

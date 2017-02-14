@@ -2754,7 +2754,6 @@ import _ = require("lodash");
         private SCALE_ULIMIT: number = 0.002;
         private SCALE_LLIMIT: number = 1;
 
-        // These variables with m_* prefix are used for plot area.
         private m_leftMargin: number;
         private m_topMargin: number;
         private m_rightMargin: number;
@@ -4688,8 +4687,6 @@ import _ = require("lodash");
             this.m_dXAxisRightMargin = this.DEFAULT_XAXIS_RIGHT_MARGIN;
             this.PlotLeftRange = 0;
             this.PlotRightRange = 1;
-            this.m_scale = 0;
-            this.m_oldscale = 0;
         }
 
         private SetCoordinate() {
@@ -4715,7 +4712,7 @@ import _ = require("lodash");
             this.CalculateYAxisTickCoordinate();
             this.CalculateXAxisTickCoordinate();
             this.CalculateDataPointCoordinate();
-
+   
             this.GenerateSVGParts();
             this.PlotSVG.ondblclick = (e) => {
                 if (this.ShowZoomControl) {
@@ -4807,8 +4804,11 @@ import _ = require("lodash");
             this.ContainerWidth = sz.Width;
             this.ContainerHeight = sz.Height;
 
+            this.m_oldscale = this.m_scale;
+            this.m_scale = this.SCALE_LLIMIT;
             this.SetCoordinate();
             this.Draw();
+            this.ZoomToScale(this.m_oldscale);
         }
 
         // Mouse events

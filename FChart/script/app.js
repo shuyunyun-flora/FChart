@@ -55,7 +55,7 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         chart.Legend.Layout = FChartX.LegendLayout.Top;
         chart.Legend.ContentOrientation = FChartX.Orientation.Horizontal;
         chart.ShowZoomControl = true;
-        chart.ZoomDirection = FChartX.ChartZoomDirection.XAxis;
+        chart.ZoomDirection = FChartX.ChartZoomDirection.Both;
         chart.MaxZoomLevel = 20;
         chart.ZoomControl.Layout = FChartX.ZoomControlLayout.Right;
         chart.ZoomControl.VerticalAlignment = FChartX.VerticalAlignment.Top;
@@ -128,9 +128,9 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         chart.DataSeries.push(serie2);
         var chart2 = new FChartX.FChart();
         chart2.BindTo = "divDemoChart2";
-        chart.ParentChart = chart2;
+        //chart.ParentChart = chart2;
         chart.Render();
-        chart2.Render();
+        //chart2.Render();
     }
 });
 //# sourceMappingURL=app.js.map
