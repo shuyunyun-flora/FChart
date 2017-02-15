@@ -88,6 +88,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
     var FChartEventTypes = exports.FChartEventTypes;
     var ChartGraphObject = (function () {
         function ChartGraphObject() {
+            this.AttachedChart = null;
             this.Key = "";
             this.LineWidth = 1;
             this.LineColor = "black";
@@ -425,9 +426,19 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.TickWidth = 0;
             this.MarginBetweenTickAndLabel = 0;
             this.MaxTickLabelWidth = 0;
-            this.PlotY = 0;
+            this.m_dPlotY = 0;
             this.Type = ChartAxisType.YAxis;
         }
+        Object.defineProperty(FChartYAxis.prototype, "PlotY", {
+            get: function () {
+                return this.m_dPlotY * this.AttachedChart.ZoomLevel;
+            },
+            set: function (value) {
+                this.m_dPlotY = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
         FChartYAxis.prototype.Draw = function (chart) {
             // Draw axis line and tick.
             var svg = chart.GetSVGSVGElementByID("svg-yaxis-" + this.ID, true);
@@ -581,7 +592,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         __extends(FChartDataSerie, _super);
         function FChartDataSerie() {
             _super.apply(this, arguments);
-            this.AttachedChart = null;
             this.Data = new Array();
             this.Mark = new ChartMark();
             this.Label = "";
@@ -591,9 +601,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.DrawType = FDataSerieDrawType.StraightLine;
         }
         FChartDataSerie.prototype.Draw = function (chart) {
-            if (!this.Show) {
-                return;
-            }
             var svgPlot = chart.GetPlotSVG();
             if (FChartHelper.ObjectIsNullOrEmpty(svgPlot)) {
                 return;
@@ -1138,7 +1145,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.MaxBarSize = 16;
             this.ShortSize = 0;
             this.LongSize = 0;
-            this.AttachedChart = null;
             this.ZoomInHolder = null;
             this.ZoomOutHolder = null;
             this.DraggerHolder = null;
@@ -1662,7 +1668,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         __extends(FChartRangeControl, _super);
         function FChartRangeControl() {
             _super.apply(this, arguments);
-            this.AttachedChart = null;
             this.TopHorizontalBarPosition = new FloatPoint(0, 0);
             this.BottomHorizontalBarPosition = new FloatPoint(0, 0);
             this.LeftVerticalBarPosition = new FloatPoint(0, 0);
@@ -2879,10 +2884,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             if (FChartHelper.ObjectIsNullOrEmpty(divContainer)) {
                 return;
             }
-            this.MaxZoomLevel = Math.ceil(Math.abs(this.MaxZoomLevel));
-            for (var i = 0; i < this.DataSeries.length; i++) {
-                this.DataSeries[i].AttachedChart = this;
-            }
             var rangeChangedHandler = null;
             for (var i = 0; i < this.EventListenerMap.length; i++) {
                 var kvp = this.EventListenerMap[i];
@@ -2895,6 +2896,16 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             if (!FChartHelper.ObjectIsNullOrEmpty(this.ChildChart) && !FChartHelper.ObjectIsNullOrEmpty(rangeChangedHandler)) {
                 this.EventListenerMap.push(new KeyValuePair(FChartEventTypes.RangeChanged, rangeChangedHandler));
             }
+            for (var i = 0; i < this.XAxes.length; i++) {
+                this.XAxes[i].AttachedChart = this;
+            }
+            for (var i = 0; i < this.YAxes.length; i++) {
+                this.YAxes[i].AttachedChart = this;
+            }
+            for (var i = 0; i < this.DataSeries.length; i++) {
+                this.DataSeries[i].AttachedChart = this;
+            }
+            this.MaxZoomLevel = Math.ceil(Math.abs(this.MaxZoomLevel));
             this.PrepareContainer();
             this.SetCoordinate();
             this.Draw();
@@ -2960,14 +2971,14 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         };
         FChart.prototype.DrawXAxes = function () {
             for (var i = 0; i < this.XAxes.length; i++) {
-                if (this.XAxes[i].Show) {
+                if (this.IsAxisVisible(this.XAxes[i])) {
                     this.XAxes[i].Draw(this);
                 }
             }
         };
         FChart.prototype.DrawYAxes = function () {
             for (var i = 0; i < this.YAxes.length; i++) {
-                if (this.YAxes[i].Show) {
+                if (this.IsAxisVisible(this.YAxes[i])) {
                     this.YAxes[i].Draw(this);
                 }
             }
@@ -3618,7 +3629,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             var nCountY = this.GetVisibleYAxesCount();
             var yw = (yAxesWidth == 0 || nCountY == 0) ? 0 : yAxesWidth / nCountY;
             for (var i = 0; i < this.YAxes.length; i++) {
-                if (this.YAxes[i].Show) {
+                if (this.IsAxisVisible(this.YAxes[i])) {
                     this.YAxes[i].Width = yw;
                     this.YAxes[i].Tick.Width = yw * 0.2;
                 }
@@ -3627,7 +3638,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             var nCountX = this.GetVisibleXAxesCount();
             var xh = (xAxesHeight == 0 || nCountX == 0) ? 0 : xAxesHeight / nCountX;
             for (var i = 0; i < this.XAxes.length; i++) {
-                if (this.XAxes[i].Show) {
+                if (this.IsAxisVisible(this.XAxes[i])) {
                     this.XAxes[i].Height = xh;
                     this.XAxes[i].Tick.Height = xh * 0.2;
                 }
@@ -3705,6 +3716,10 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             if (this.XAxisMargin > 0) {
                 this.m_width -= this.XAxisMargin;
             }
+            this.m_minx = -this.m_width / 2;
+            this.m_maxx = this.m_width / 2;
+            this.m_miny = -this.m_height / 2;
+            this.m_maxy = this.m_height / 2;
             this.SetWindow();
         };
         FChart.prototype.CalculatePartsPosition = function () {
@@ -3819,7 +3834,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             yStart += rangeControlHeight / 2;
             for (var i = 0; i < this.XAxes.length; i++) {
                 var xaxis_1 = this.XAxes[i];
-                if (!xaxis_1.Show) {
+                if (!this.IsAxisVisible(xaxis_1)) {
                     continue;
                 }
                 xaxis_1.X = keepXStart;
@@ -4122,7 +4137,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         FChart.prototype.GenerateSVGParts = function () {
             var divContainer = document.getElementById(this.BindTo);
             for (var i = 0; i < this.YAxes.length; i++) {
-                if (this.YAxes[i].Show) {
+                if (this.IsAxisVisible(this.YAxes[i])) {
                     var yaxis = this.YAxes[i];
                     var svgY = this.CreateSVG("svg-yaxis-" + yaxis.ID, "absolute", yaxis.X.toString(), yaxis.Y.toString(), yaxis.Width.toString(), this.m_height.toString());
                     divContainer.appendChild(svgY);
@@ -4150,7 +4165,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             else {
                 for (var i = 0; i < this.XAxes.length; i++) {
                     var xaxis = this.XAxes[i];
-                    if (!xaxis.Show) {
+                    if (!this.IsAxisVisible(xaxis)) {
                         continue;
                     }
                     var svgX = this.CreateSVG("svg-xaxis-" + xaxis.ID, "absolute", xaxis.X.toString(), xaxis.Y.toString(), this.PlotWidth.toString(), xaxis.Height.toString());
@@ -4201,10 +4216,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 this.m_yb = this.m_yt - this.m_scale * this.m_height;
             }
             else {
-                this.m_minx = -this.m_width / 2;
-                this.m_maxx = this.m_width / 2;
-                this.m_miny = -this.m_height / 2;
-                this.m_maxy = this.m_height / 2;
                 var xx1 = (this.m_maxy - this.m_miny) * this.m_width * 0.5 / this.m_height;
                 var xx2 = (this.m_maxx - this.m_minx) * this.m_height * 0.5 / this.m_width;
                 var scale1 = (this.m_maxy - this.m_miny) / this.m_height;
@@ -4339,7 +4350,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.ContainerWidth = sz.Width;
             this.ContainerHeight = sz.Height;
             this.m_oldscale = this.m_scale;
-            this.m_scale = this.SCALE_LLIMIT;
+            this.m_scale = 0;
             this.SetCoordinate();
             this.Draw();
             this.ZoomToScale(this.m_oldscale);

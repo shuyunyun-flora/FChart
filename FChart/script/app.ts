@@ -61,7 +61,7 @@ function DemoChart(): void {
     chart.Legend.Layout = FChartX.LegendLayout.Top;
     chart.Legend.ContentOrientation = FChartX.Orientation.Horizontal;
     chart.ShowZoomControl = true;
-    chart.ZoomDirection = FChartX.ChartZoomDirection.Both;
+    chart.ZoomDirection = FChartX.ChartZoomDirection.YAxis;
     chart.MaxZoomLevel = 20;
     chart.ZoomControl.Layout = FChartX.ZoomControlLayout.Right;
     chart.ZoomControl.VerticalAlignment = FChartX.VerticalAlignment.Top;
@@ -132,7 +132,7 @@ function DemoChart(): void {
     serie1.Data.push(pt5);
     serie1.Data.push(pt6);
     chart.DataSeries.push(serie1);
-    chart.DataSeries.push(serie2);
+    //chart.DataSeries.push(serie2);
 
     let chart2: FChartX.FChart = new FChartX.FChart();
     chart2.BindTo = "divDemoChart2";

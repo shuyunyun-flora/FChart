@@ -86,6 +86,7 @@ import _ = require("lodash");
     }
 
     class ChartGraphObject {
+        public AttachedChart: FChart = null;
         public Key: string = "";
         public LineWidth: number = 1;
         public LineColor: string = "black";
@@ -427,7 +428,14 @@ import _ = require("lodash");
         private MarginBetweenTickAndLabel: number = 0;
         private MaxTickLabelWidth: number = 0;
 
-        public PlotY: number = 0;
+        private m_dPlotY: number = 0;
+        public get PlotY() {
+            return this.m_dPlotY * this.AttachedChart.ZoomLevel;
+        }
+
+        public set PlotY(value: number) {
+            this.m_dPlotY = value;
+        }
 
         constructor() {
             super();
@@ -603,7 +611,6 @@ import _ = require("lodash");
     }
 
     export class FChartDataSerie extends ChartGraphObject {
-        public AttachedChart: FChart = null;
         public Data: DataPoint[] = new Array<DataPoint>();
         public Mark: ChartMark = new ChartMark();
         public Label: string = "";
@@ -613,10 +620,6 @@ import _ = require("lodash");
         public DrawType: FDataSerieDrawType = FDataSerieDrawType.StraightLine;
 
         public Draw(chart: FChart): void {
-            if (!this.Show) {
-                return;
-            }
-
             let svgPlot: SVGSVGElement = chart.GetPlotSVG();
             if (FChartHelper.ObjectIsNullOrEmpty(svgPlot)) {
                 return;
@@ -1228,7 +1231,6 @@ import _ = require("lodash");
             return m;
         }
 
-        public AttachedChart: FChart = null;
         private ZoomInHolder: SVGCircleElement = null;
         private ZoomOutHolder: SVGCircleElement = null;
         private DraggerHolder: SVGPathElement = null;
@@ -1763,7 +1765,6 @@ import _ = require("lodash");
     }
 
     class FChartRangeControl extends ChartGraphObject {
-        public AttachedChart: FChart = null;
         public TopHorizontalBarPosition: FloatPoint = new FloatPoint(0, 0);
         public BottomHorizontalBarPosition: FloatPoint = new FloatPoint(0, 0);
         public LeftVerticalBarPosition: FloatPoint = new FloatPoint(0, 0);
@@ -3064,11 +3065,6 @@ import _ = require("lodash");
                 return;
             }
 
-            this.MaxZoomLevel = Math.ceil(Math.abs(this.MaxZoomLevel));
-
-            for (let i = 0; i < this.DataSeries.length; i++) {
-                this.DataSeries[i].AttachedChart = this;
-            }
             let rangeChangedHandler: any = null;
             for (let i = 0; i < this.EventListenerMap.length; i++) {
                 let kvp: KeyValuePair<FChartEventTypes, any> = this.EventListenerMap[i];
@@ -3081,6 +3077,18 @@ import _ = require("lodash");
             if (!FChartHelper.ObjectIsNullOrEmpty(this.ChildChart) && !FChartHelper.ObjectIsNullOrEmpty(rangeChangedHandler)) {
                 this.EventListenerMap.push(new KeyValuePair<FChartEventTypes, any>(FChartEventTypes.RangeChanged, rangeChangedHandler));
             }
+
+            for (let i = 0; i < this.XAxes.length; i++) {
+                this.XAxes[i].AttachedChart = this;
+            }
+            for (let i = 0; i < this.YAxes.length; i++) {
+                this.YAxes[i].AttachedChart = this;
+            }
+            for (let i = 0; i < this.DataSeries.length; i++) {
+                this.DataSeries[i].AttachedChart = this;
+            }
+
+            this.MaxZoomLevel = Math.ceil(Math.abs(this.MaxZoomLevel));
 
             this.PrepareContainer();
             this.SetCoordinate();
@@ -3157,7 +3165,7 @@ import _ = require("lodash");
 
         private DrawXAxes(): void {
             for (let i = 0; i < this.XAxes.length; i++) {
-                if (this.XAxes[i].Show) {
+                if (this.IsAxisVisible(this.XAxes[i])) {
                     this.XAxes[i].Draw(this);
                 }
             }
@@ -3165,7 +3173,7 @@ import _ = require("lodash");
 
         private DrawYAxes(): void {
             for (let i = 0; i < this.YAxes.length; i++) {
-                if (this.YAxes[i].Show) {
+                if (this.IsAxisVisible(this.YAxes[i])) {
                     this.YAxes[i].Draw(this);
                 }
             }
@@ -3934,7 +3942,7 @@ import _ = require("lodash");
             let nCountY: number = this.GetVisibleYAxesCount();
             let yw: number = (yAxesWidth == 0 || nCountY == 0) ? 0 : yAxesWidth / nCountY;
             for (let i = 0; i < this.YAxes.length; i++) {
-                if (this.YAxes[i].Show) {
+                if (this.IsAxisVisible(this.YAxes[i])) {
                     this.YAxes[i].Width = yw;
                     this.YAxes[i].Tick.Width = yw * 0.2;
                 }
@@ -3944,7 +3952,7 @@ import _ = require("lodash");
             let nCountX: number = this.GetVisibleXAxesCount();
             let xh: number = (xAxesHeight == 0 || nCountX == 0) ? 0 : xAxesHeight / nCountX;
             for (let i = 0; i < this.XAxes.length; i++) {
-                if (this.XAxes[i].Show) {
+                if (this.IsAxisVisible(this.XAxes[i])) {
                     this.XAxes[i].Height = xh;
                     this.XAxes[i].Tick.Height = xh * 0.2;
                 }
@@ -4030,6 +4038,11 @@ import _ = require("lodash");
             if (this.XAxisMargin > 0) {
                 this.m_width -= this.XAxisMargin;
             }
+
+            this.m_minx = -this.m_width / 2;
+            this.m_maxx = this.m_width / 2;
+            this.m_miny = -this.m_height / 2;
+            this.m_maxy = this.m_height / 2;
 
             this.SetWindow();
         }
@@ -4164,7 +4177,7 @@ import _ = require("lodash");
 
             for (let i = 0; i < this.XAxes.length; i++) {
                 let xaxis: FChartXAxis = this.XAxes[i];
-                if (!xaxis.Show) {
+                if (!this.IsAxisVisible(xaxis)) {
                     continue;
                 }
 
@@ -4507,7 +4520,7 @@ import _ = require("lodash");
         private GenerateSVGParts() {
             let divContainer: HTMLDivElement = document.getElementById(this.BindTo) as HTMLDivElement;
             for (let i = 0; i < this.YAxes.length; i++) {
-                if (this.YAxes[i].Show) {
+                if (this.IsAxisVisible(this.YAxes[i])) {
                     let yaxis: FChartYAxis = this.YAxes[i];
                     let svgY: SVGSVGElement = this.CreateSVG("svg-yaxis-" + yaxis.ID, "absolute", yaxis.X.toString(), yaxis.Y.toString(), yaxis.Width.toString(), this.m_height.toString());
                     divContainer.appendChild(svgY);
@@ -4538,7 +4551,7 @@ import _ = require("lodash");
             else {
                 for (let i = 0; i < this.XAxes.length; i++) {
                     let xaxis: FChartXAxis = this.XAxes[i];
-                    if (!xaxis.Show) {
+                    if (!this.IsAxisVisible(xaxis)) {
                         continue;
                     }
 
@@ -4595,11 +4608,6 @@ import _ = require("lodash");
                 this.m_yb = this.m_yt - this.m_scale * this.m_height;
             }
             else {
-                this.m_minx = -this.m_width / 2;
-                this.m_maxx = this.m_width / 2;
-                this.m_miny = -this.m_height / 2;
-                this.m_maxy = this.m_height / 2;
-
                 let xx1 = (this.m_maxy - this.m_miny) * this.m_width * 0.5 / this.m_height;
                 let xx2 = (this.m_maxx - this.m_minx) * this.m_height * 0.5 / this.m_width;
                 let scale1 = (this.m_maxy - this.m_miny) / this.m_height;
@@ -4805,7 +4813,7 @@ import _ = require("lodash");
             this.ContainerHeight = sz.Height;
 
             this.m_oldscale = this.m_scale;
-            this.m_scale = this.SCALE_LLIMIT;
+            this.m_scale = 0;
             this.SetCoordinate();
             this.Draw();
             this.ZoomToScale(this.m_oldscale);

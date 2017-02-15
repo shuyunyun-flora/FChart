@@ -55,7 +55,7 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         chart.Legend.Layout = FChartX.LegendLayout.Top;
         chart.Legend.ContentOrientation = FChartX.Orientation.Horizontal;
         chart.ShowZoomControl = true;
-        chart.ZoomDirection = FChartX.ChartZoomDirection.Both;
+        chart.ZoomDirection = FChartX.ChartZoomDirection.YAxis;
         chart.MaxZoomLevel = 20;
         chart.ZoomControl.Layout = FChartX.ZoomControlLayout.Right;
         chart.ZoomControl.VerticalAlignment = FChartX.VerticalAlignment.Top;
@@ -125,7 +125,7 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         serie1.Data.push(pt5);
         serie1.Data.push(pt6);
         chart.DataSeries.push(serie1);
-        chart.DataSeries.push(serie2);
+        //chart.DataSeries.push(serie2);
         var chart2 = new FChartX.FChart();
         chart2.BindTo = "divDemoChart2";
         //chart.ParentChart = chart2;
