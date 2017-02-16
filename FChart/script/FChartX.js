@@ -333,7 +333,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 if (!FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
                     return false;
                 }
-                return (this.AttachedChart.ZoomDirection != ChartZoomDirection.YAxis);
+                return (this.AttachedChart.Zoomable && this.AttachedChart.ZoomDirection != ChartZoomDirection.YAxis);
             },
             enumerable: true,
             configurable: true
@@ -461,7 +461,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 if (!FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
                     return false;
                 }
-                return (this.AttachedChart.ZoomDirection != ChartZoomDirection.XAxis);
+                return (this.AttachedChart.Zoomable && this.AttachedChart.ZoomDirection != ChartZoomDirection.XAxis);
             },
             enumerable: true,
             configurable: true
@@ -1246,6 +1246,12 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.DraggerHolderID = this.AttachedChart.IdentifyID("zoomcontrol-dragger-holder");
             this.LabelHolderID = this.AttachedChart.IdentifyID("zoomcontrol-label-holder");
             this.ProgressBarHolderID = this.AttachedChart.IdentifyID("zoomcontrol-progressbar-holder");
+        };
+        FChartZoomControl.prototype.IsVisible = function () {
+            if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
+                return false;
+            }
+            return (this.AttachedChart.ShowZoomControl && this.AttachedChart.Zoomable);
         };
         FChartZoomControl.prototype.CalculateShortSize = function (availableSpace) {
             if (availableSpace > this.DefaultShortSize) {
@@ -2454,6 +2460,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.ZoomControl = new FChartZoomControl();
             this.ShowRangeControl = false;
             this.RangeControl = new FChartRangeControl();
+            this.Zoomable = false;
             this.AspectRatio = 1.0;
             this.KeepAspectRatio = false; // If false, ignore AspectRatio, If true, consider AspectRatio.
             this.m_chartParent = null;
@@ -2512,7 +2519,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.ChartMouseDown = function (e) {
                 e.preventDefault();
                 _this.OnMouseDown(e);
-                if (_this.ShowZoomControl) {
+                if (_this.ZoomControl.IsVisible()) {
                     _this.ZoomControl.OnMouseDown(e);
                 }
                 if (_this.ShowRangeControl) {
@@ -2522,7 +2529,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.ChartMouseMove = function (e) {
                 e.preventDefault();
                 _this.OnMouseMove(e);
-                if (_this.ShowZoomControl) {
+                if (_this.ZoomControl.IsVisible()) {
                     _this.ZoomControl.OnMouseMove(e);
                 }
                 if (_this.ShowRangeControl) {
@@ -2532,7 +2539,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.ChartMouseUp = function (e) {
                 e.preventDefault();
                 _this.OnMouseUp(e);
-                if (_this.ShowZoomControl) {
+                if (_this.ZoomControl.IsVisible()) {
                     _this.ZoomControl.OnMouseUp(e);
                 }
                 if (_this.ShowRangeControl) {
@@ -2571,6 +2578,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     }
                     this.ParentChart.ShowRangeControl = true;
                     this.ParentChart.ShowZoomControl = false;
+                    this.ParentChart.Zoomable = false;
                     this.ParentChart.Legend.Show = false;
                     if (!FChartHelper.ObjectIsNullOrEmpty(this.ParentChart)) {
                         this.ParentChart.EventListenerMap.push(new KeyValuePair(FChartEventTypes.RangeChanged, function (leftRange, rightRange) {
@@ -2578,6 +2586,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                         }));
                     }
                     this.ParentChart.ChildChart = this;
+                    this.ShowZoomControl = false;
                 }
             },
             enumerable: true,
@@ -2932,6 +2941,8 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             for (var i = 0; i < this.DataSeries.length; i++) {
                 this.DataSeries[i].AttachedChart = this;
             }
+            this.ZoomControl.AttachedChart = this;
+            this.RangeControl.AttachedChart = this;
             this.MaxZoomLevel = Math.ceil(Math.abs(this.MaxZoomLevel));
             this.PrepareContainer();
             this.SetCoordinate();
@@ -3147,7 +3158,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             }
         };
         FChart.prototype.DrawZoomControl = function () {
-            if (this.ShowZoomControl) {
+            if (this.ZoomControl.IsVisible()) {
                 this.ZoomControl.Draw(this);
             }
         };
@@ -3527,7 +3538,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     xAxesHeight = 0;
                 }
                 var availableSpace = this.ChartHeight - xAxesHeight;
-                if (this.ShowZoomControl && availableSpace > 0) {
+                if (this.ZoomControl.IsVisible() && availableSpace > 0) {
                     if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                         var hz = availableSpace * 0.2;
                         this.ZoomControl.CalculateShortSize(hz);
@@ -3539,7 +3550,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 var maxHeight = 0;
                 if (this.Legend.Layout == LegendLayout.Top || this.Legend.Layout == LegendLayout.Bottom) {
                     maxHeight = h * 0.3;
-                    if (this.ShowZoomControl) {
+                    if (this.ZoomControl.IsVisible()) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                             var hz = h * 0.1;
                             this.ZoomControl.CalculateShortSize(hz);
@@ -3549,7 +3560,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 }
                 else {
                     maxHeight = h * 0.5;
-                    if (this.ShowZoomControl) {
+                    if (this.ZoomControl.IsVisible()) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Top || this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                             var hz = h * 0.1;
                             this.ZoomControl.CalculateShortSize(hz);
@@ -3589,7 +3600,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     yAxesWidth = 0;
                 }
                 var availableSpace = this.ChartWidth - yAxesWidth;
-                if (this.ShowZoomControl && availableSpace > 0) {
+                if (this.ZoomControl.IsVisible() && availableSpace > 0) {
                     if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                         var wz = availableSpace * 0.2;
                         this.ZoomControl.CalculateShortSize(wz);
@@ -3601,7 +3612,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 var maxWidth = 0;
                 if (this.Legend.Layout == LegendLayout.Left || this.Legend.Layout == LegendLayout.Right) {
                     maxWidth = w * 0.3;
-                    if (this.ShowZoomControl) {
+                    if (this.ZoomControl.IsVisible()) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                             var wz = w * 0.1;
                             this.ZoomControl.CalculateShortSize(wz);
@@ -3611,7 +3622,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 }
                 else {
                     maxWidth = w * 0.5;
-                    if (this.ShowZoomControl) {
+                    if (this.ZoomControl.IsVisible()) {
                         if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                             var wz = w * 0.1;
                             this.ZoomControl.CalculateShortSize(wz);
@@ -3672,7 +3683,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             }
             var zoomControlWidth = 0;
             var zoomControlHeight = 0;
-            if (this.ShowZoomControl) {
+            if (this.ZoomControl.IsVisible()) {
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                     zoomControlWidth = this.ZoomControl.ShortSize;
                 }
@@ -3730,7 +3741,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     this.Legend.CalculateSize(this);
                 }
             }
-            if (this.ShowZoomControl) {
+            if (this.ZoomControl.IsVisible()) {
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                     this.ZoomControl.CalculateLongSize(this.PlotHeight);
                 }
@@ -3776,7 +3787,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             var yStart = 0;
             var zoomControlWidth = 0;
             var zoomControlHeight = 0;
-            if (this.ShowZoomControl) {
+            if (this.ZoomControl.IsVisible()) {
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                     zoomControlWidth = this.ZoomControl.ShortSize;
                 }
@@ -3786,11 +3797,11 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             }
             var rangeControlWidth = this.ShowRangeControl ? this.RangeControl.VerticalBarSize : 0;
             var rangeControlHeight = this.ShowRangeControl ? this.RangeControl.HorizontalBarSize : 0;
-            if (this.ShowZoomControl && this.ZoomControl.Layout == ZoomControlLayout.Left) {
+            if (this.ZoomControl.IsVisible() && this.ZoomControl.Layout == ZoomControlLayout.Left) {
                 this.ZoomControl.X = xStart;
                 xStart += zoomControlWidth;
             }
-            if (this.ShowZoomControl && this.ZoomControl.Layout == ZoomControlLayout.Top) {
+            if (this.ZoomControl.IsVisible() && this.ZoomControl.Layout == ZoomControlLayout.Top) {
                 this.ZoomControl.Y = yStart;
                 yStart += zoomControlHeight;
             }
@@ -3879,13 +3890,13 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     yStart += this.Legend.Height;
                 }
             }
-            if (this.ShowZoomControl && this.ZoomControl.Layout == ZoomControlLayout.Right) {
+            if (this.ZoomControl.IsVisible() && this.ZoomControl.Layout == ZoomControlLayout.Right) {
                 this.ZoomControl.X = xStart;
             }
-            if (this.ShowZoomControl && this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
+            if (this.ZoomControl.IsVisible() && this.ZoomControl.Layout == ZoomControlLayout.Bottom) {
                 this.ZoomControl.Y = yStart;
             }
-            if (this.ShowZoomControl) {
+            if (this.ZoomControl.IsVisible()) {
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
                     if (this.ZoomControl.VerticalAlignment == VerticalAlignment.Top) {
                         this.ZoomControl.Y = this.PlotPosition.Y;
@@ -4206,7 +4217,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 divContainer.appendChild(svgLegend);
                 this.m_arrSVG.push(svgLegend);
             }
-            if (this.ShowZoomControl) {
+            if (this.ZoomControl.IsVisible()) {
                 var wz = 0;
                 var hz = 0;
                 if (this.ZoomControl.Layout == ZoomControlLayout.Left || this.ZoomControl.Layout == ZoomControlLayout.Right) {
@@ -4345,7 +4356,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.CalculateDataPointCoordinate();
             this.GenerateSVGParts();
             this.PlotSVG.ondblclick = function (e) {
-                if (_this.ShowZoomControl) {
+                if (_this.Zoomable) {
                     _this.ZoomToFull();
                 }
             };
