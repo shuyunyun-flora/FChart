@@ -152,6 +152,10 @@ import _ = require("lodash");
             return coord;
         }
 
+        public get Zoomable() {
+            return true;
+        }
+
         public Draw(chart: FChart): void {
         }
     }
@@ -313,6 +317,14 @@ import _ = require("lodash");
             this.Type = ChartAxisType.XAxis;
         }
 
+        public get Zoomable() {
+            if (!FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
+                return false;
+            }
+
+            return (this.AttachedChart.ZoomDirection != ChartZoomDirection.YAxis);
+        }
+
         public Draw(chart: FChart): void {
             // Draw axis line and tick.
             let xAxisLine: SVGLineElement = chart.CreateSVGLineElement();
@@ -430,7 +442,7 @@ import _ = require("lodash");
 
         private m_dPlotY: number = 0;
         public get PlotY() {
-            return this.m_dPlotY * this.AttachedChart.ZoomLevel;
+            return this.m_dPlotY * (this.Zoomable ? this.AttachedChart.ZoomLevel : 1);
         }
 
         public set PlotY(value: number) {
@@ -440,6 +452,14 @@ import _ = require("lodash");
         constructor() {
             super();
             this.Type = ChartAxisType.YAxis;
+        }
+
+        public get Zoomable() {
+            if (!FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
+                return false;
+            }
+
+            return (this.AttachedChart.ZoomDirection != ChartZoomDirection.XAxis);
         }
 
         public Draw(chart: FChart): void {

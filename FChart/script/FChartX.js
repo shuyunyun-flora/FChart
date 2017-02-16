@@ -146,6 +146,13 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             coord = (value - this.StartValue) * this.PixelsPerValue;
             return coord;
         };
+        Object.defineProperty(FChartAxis.prototype, "Zoomable", {
+            get: function () {
+                return true;
+            },
+            enumerable: true,
+            configurable: true
+        });
         FChartAxis.prototype.Draw = function (chart) {
         };
         return FChartAxis;
@@ -321,6 +328,16 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.Title = null;
             this.Type = ChartAxisType.XAxis;
         }
+        Object.defineProperty(FChartXAxis.prototype, "Zoomable", {
+            get: function () {
+                if (!FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
+                    return false;
+                }
+                return (this.AttachedChart.ZoomDirection != ChartZoomDirection.YAxis);
+            },
+            enumerable: true,
+            configurable: true
+        });
         FChartXAxis.prototype.Draw = function (chart) {
             // Draw axis line and tick.
             var xAxisLine = chart.CreateSVGLineElement();
@@ -431,10 +448,20 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         }
         Object.defineProperty(FChartYAxis.prototype, "PlotY", {
             get: function () {
-                return this.m_dPlotY * this.AttachedChart.ZoomLevel;
+                return this.m_dPlotY * (this.Zoomable ? this.AttachedChart.ZoomLevel : 1);
             },
             set: function (value) {
                 this.m_dPlotY = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(FChartYAxis.prototype, "Zoomable", {
+            get: function () {
+                if (!FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
+                    return false;
+                }
+                return (this.AttachedChart.ZoomDirection != ChartZoomDirection.XAxis);
             },
             enumerable: true,
             configurable: true
