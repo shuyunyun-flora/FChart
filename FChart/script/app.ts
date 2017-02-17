@@ -61,7 +61,7 @@ function DemoChart(): void {
     chart.Legend.Layout = FChartX.LegendLayout.Top;
     chart.Legend.ContentOrientation = FChartX.Orientation.Horizontal;
     chart.ShowZoomControl = true;
-    chart.Zoomable = false;
+    chart.Zoomable = true;
     chart.ZoomDirection = FChartX.ChartZoomDirection.XAxis;
     chart.MaxZoomLevel = 20;
     chart.ZoomControl.Layout = FChartX.ZoomControlLayout.Right;
