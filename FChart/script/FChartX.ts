@@ -5347,6 +5347,10 @@ import _ = require("lodash");
             if (this.ShowRangeControl) {
                 this.RangeControl.OnMouseDown(e);
             }
+
+            if (this.ShowScrollBar) {
+                this.HorizontalScrollBar.OnMouseDown(e);
+            }
         };
 
         private ChartMouseMove: any = (e: MouseEvent) => {
@@ -5359,6 +5363,9 @@ import _ = require("lodash");
             if (this.ShowRangeControl) {
                 this.RangeControl.OnMouseMove(e);
             }
+            if (this.ShowScrollBar) {
+                this.HorizontalScrollBar.OnMouseMove(e);
+            }
         }
 
         private ChartMouseUp: any = (e: MouseEvent) => {
@@ -5370,6 +5377,9 @@ import _ = require("lodash");
             }
             if (this.ShowRangeControl) {
                 this.RangeControl.OnMouseUp(e);
+            }
+            if (this.ShowScrollBar) {
+                this.HorizontalScrollBar.OnMouseUp(e);
             }
         }
 

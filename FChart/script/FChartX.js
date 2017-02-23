@@ -2935,6 +2935,9 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 if (_this.ShowRangeControl) {
                     _this.RangeControl.OnMouseDown(e);
                 }
+                if (_this.ShowScrollBar) {
+                    _this.HorizontalScrollBar.OnMouseDown(e);
+                }
             };
             this.ChartMouseMove = function (e) {
                 e.preventDefault();
@@ -2945,6 +2948,9 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 if (_this.ShowRangeControl) {
                     _this.RangeControl.OnMouseMove(e);
                 }
+                if (_this.ShowScrollBar) {
+                    _this.HorizontalScrollBar.OnMouseMove(e);
+                }
             };
             this.ChartMouseUp = function (e) {
                 e.preventDefault();
@@ -2954,6 +2960,9 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 }
                 if (_this.ShowRangeControl) {
                     _this.RangeControl.OnMouseUp(e);
+                }
+                if (_this.ShowScrollBar) {
+                    _this.HorizontalScrollBar.OnMouseUp(e);
                 }
             };
             this.ChartMouseOver = function (e) {
