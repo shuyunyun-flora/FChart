@@ -9,6 +9,7 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         chart.UseFixedXAxesHeight = true;
         chart.FixedXAxesLengthType = FChartX.LengthType.Percentage;
         chart.FixedXAxesHeight = 0.3;
+        chart.ShowScrollBar = true;
         var xaxis1 = new FChartX.FChartXAxis();
         xaxis1.Show = true;
         xaxis1.ID = "XAxis-1";
@@ -56,7 +57,7 @@ define(["require", "exports", "jquery", "script/FChartX"], function (require, ex
         chart.Legend.ContentOrientation = FChartX.Orientation.Horizontal;
         chart.ShowZoomControl = true;
         chart.Zoomable = true;
-        chart.ZoomDirection = FChartX.ChartZoomDirection.XAxis;
+        chart.ZoomDirection = FChartX.ChartZoomDirection.Both;
         chart.MaxZoomLevel = 20;
         chart.ZoomControl.Layout = FChartX.ZoomControlLayout.Right;
         chart.ZoomControl.VerticalAlignment = FChartX.VerticalAlignment.Top;
