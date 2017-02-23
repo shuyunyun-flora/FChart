@@ -112,8 +112,11 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.Show = true;
             this.X = 0;
             this.Y = 0;
+            this.IDIdentified = false;
         }
         ChartGraphObject.prototype.Draw = function (chart) {
+        };
+        ChartGraphObject.prototype.IdentifyID = function () {
         };
         return ChartGraphObject;
     }());
@@ -1237,6 +1240,9 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
                 return;
             }
+            if (this.IDIdentified) {
+                return;
+            }
             this.ID = this.AttachedChart.IdentifyID("svg-zoomcontrol");
             this.ZoomInHolderID = this.AttachedChart.IdentifyID("zoomcontrol-zoomin-holder");
             this.ZoomInHolderL1ID = this.AttachedChart.IdentifyID("zoomcontrol-zoomin-holder-l1");
@@ -1246,6 +1252,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.DraggerHolderID = this.AttachedChart.IdentifyID("zoomcontrol-dragger-holder");
             this.LabelHolderID = this.AttachedChart.IdentifyID("zoomcontrol-label-holder");
             this.ProgressBarHolderID = this.AttachedChart.IdentifyID("zoomcontrol-progressbar-holder");
+            this.IDIdentified = true;
         };
         FChartZoomControl.prototype.IsVisible = function () {
             if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
@@ -1672,6 +1679,403 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         return FChartZoomControl;
     }(ChartGraphObject));
     exports.FChartZoomControl = FChartZoomControl;
+    var HorizontalScrollBarEventTypes;
+    (function (HorizontalScrollBarEventTypes) {
+        HorizontalScrollBarEventTypes[HorizontalScrollBarEventTypes["LineLeft"] = 0] = "LineLeft";
+        HorizontalScrollBarEventTypes[HorizontalScrollBarEventTypes["LineRight"] = 1] = "LineRight";
+        HorizontalScrollBarEventTypes[HorizontalScrollBarEventTypes["PageLeft"] = 2] = "PageLeft";
+        HorizontalScrollBarEventTypes[HorizontalScrollBarEventTypes["PageRight"] = 3] = "PageRight";
+        HorizontalScrollBarEventTypes[HorizontalScrollBarEventTypes["Scroll"] = 4] = "Scroll";
+    })(HorizontalScrollBarEventTypes || (HorizontalScrollBarEventTypes = {}));
+    var VerticalScrollBarEventTypes;
+    (function (VerticalScrollBarEventTypes) {
+        VerticalScrollBarEventTypes[VerticalScrollBarEventTypes["LineUp"] = 0] = "LineUp";
+        VerticalScrollBarEventTypes[VerticalScrollBarEventTypes["LineDown"] = 1] = "LineDown";
+        VerticalScrollBarEventTypes[VerticalScrollBarEventTypes["PageUp"] = 2] = "PageUp";
+        VerticalScrollBarEventTypes[VerticalScrollBarEventTypes["PageDown"] = 3] = "PageDown";
+        VerticalScrollBarEventTypes[VerticalScrollBarEventTypes["Scroll"] = 4] = "Scroll";
+    })(VerticalScrollBarEventTypes || (VerticalScrollBarEventTypes = {}));
+    var ScrollBarInfo = (function () {
+        function ScrollBarInfo() {
+            this.MinValue = 0;
+            this.MaxValue = 0;
+            this.ViewportRegion = new Size(0, 0);
+            this.ViewportSize = new Size(0, 0);
+            this.WindowRegion = new Size(0, 0);
+            this.Position = 0;
+        }
+        return ScrollBarInfo;
+    }());
+    var ScrollBar = (function (_super) {
+        __extends(ScrollBar, _super);
+        function ScrollBar() {
+            _super.apply(this, arguments);
+            this.Width = 0;
+            this.Height = 0;
+            this.L = 0;
+            this.TweakSize = new Size(0, 0);
+            this.ThumbnailSize = new Size(0, 0);
+            this.Info = new ScrollBarInfo();
+        }
+        ScrollBar.prototype.SetScrollBarInfo = function (info) {
+        };
+        ScrollBar.prototype.GetScrollBarInfo = function () {
+            return this.Info;
+        };
+        ScrollBar.prototype.CalculateTweakSize = function () {
+        };
+        ScrollBar.prototype.CalculateBarLength = function () {
+        };
+        ScrollBar.prototype.CalculateThumbnailSize = function () {
+        };
+        return ScrollBar;
+    }(ChartGraphObject));
+    var HorizontalScrollBar = (function (_super) {
+        __extends(HorizontalScrollBar, _super);
+        function HorizontalScrollBar() {
+            _super.apply(this, arguments);
+            this.MinHeight = 17;
+            this.MaxHeight = 17;
+            this.Presentation = null;
+            this.Mask = null;
+            this.LeftPart = null;
+            this.RightPart = null;
+            this.Thumbnail = null;
+            this.PageLeft = null;
+            this.PageRight = null;
+            this.PresentationID = "HorizontalScrollBar-Presentation";
+            this.MaskID = "HorizontalScrollBar-Mask";
+            this.LeftPartID = "HorizontalScrollBar-LeftPart";
+            this.RightPartID = "HorizontalScrollBar-RightPart";
+            this.ThumbnailID = "HorizontalScrollBar-Thumbnail";
+            this.LeftPartTriangleID = "HorizontalScrollBar-LeftPart-Triangle";
+            this.RightPartTriangleID = "HorizontalScrollBar-RightPart-Triangle";
+            this.PageLeftID = "HorizontalScrollBar-PageLeft";
+            this.PageRightID = "HorizontalScrollBar-PageRight";
+            this.EventListenerMap = new Array();
+            this.ClickingOnThumbnail = false;
+            this.DraggingStartPosition = 0;
+            this.Dragging = false;
+            this.DragThreshold = 5;
+        }
+        HorizontalScrollBar.prototype.Draw = function () {
+            if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
+                return;
+            }
+            if (!FChartHelper.ObjectIsNullOrEmpty(this.Presentation)) {
+                this.Presentation.innerHTML = "";
+            }
+            this.LeftPart = null;
+            this.RightPart = null;
+            this.Mask = null;
+            this.PageLeft = null;
+            this.PageRight = null;
+            this.Thumbnail = null;
+            var w = this.AttachedChart.GetPlotWidth();
+            var h = this.AttachedChart.GetPlotHeight();
+            this.Width = w;
+            this.Height = Math.min(h * 0.1, this.MaxHeight);
+            var x = this.AttachedChart.GetPlotX();
+            var y = this.AttachedChart.GetPlotY();
+            y = y + h - this.Height;
+            this.IdentifyID();
+            this.CalculateTweakSize();
+            this.CalculateBarLength();
+            this.Presentation = this.AttachedChart.CreateSVG(this.PresentationID, "absolute", x.toString(), y.toString(), this.Width.toString(), this.Height.toString());
+            this.DrawMask();
+            this.DrawLeftPart();
+            this.DrawRightPart();
+            this.DrawThumbnailAndPageLeftRight();
+        };
+        HorizontalScrollBar.prototype.IdentifyID = function () {
+            if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
+                return;
+            }
+            if (this.IDIdentified) {
+                return;
+            }
+            this.PresentationID = this.AttachedChart.IdentifyID(this.PresentationID);
+            this.LeftPartID = this.AttachedChart.IdentifyID(this.LeftPartID);
+            this.RightPartID = this.AttachedChart.IdentifyID(this.RightPartID);
+            this.ThumbnailID = this.AttachedChart.IdentifyID(this.ThumbnailID);
+            this.MaskID = this.AttachedChart.IdentifyID(this.MaskID);
+            this.LeftPartTriangleID = this.AttachedChart.IdentifyID(this.LeftPartTriangleID);
+            this.RightPartTriangleID = this.AttachedChart.IdentifyID(this.RightPartTriangleID);
+            this.PageLeftID = this.AttachedChart.IdentifyID(this.PageLeftID);
+            this.PageRightID = this.AttachedChart.IdentifyID(this.PageRightID);
+            this.IDIdentified = true;
+        };
+        HorizontalScrollBar.prototype.DrawLeftPart = function () {
+            var w = this.TweakSize.Width;
+            var h = this.TweakSize.Height;
+            var x1 = w / 2;
+            var y1 = 0;
+            var x2 = w / 2;
+            var y2 = h;
+            var rx = w;
+            var ry = h / 2;
+            var ox = w;
+            var oy = h / 2;
+            var sweep = 0;
+            var largeArc = 0;
+            var xaxisRotation = 0;
+            this.LeftPart = this.AttachedChart.CreateArc(x1, y1, x2, y2, rx, ry, xaxisRotation, largeArc, sweep, ox, oy, this.LineWidth, this.LineColor);
+            this.LeftPart.setAttribute("id", this.LeftPartID);
+            var x = 0;
+            var y = h / 2;
+            var trianglePath = this.AttachedChart.CreateSVGPathElement();
+            var d = "M" + x.toString() + " " + y.toString() + " " +
+                "L" + x1.toString() + " " + y1.toString() + " " +
+                "L" + x2.toString() + " " + y2.toString() + " Z";
+            trianglePath.setAttribute("id", this.LeftPartTriangleID);
+            trianglePath.setAttribute("d", d);
+        };
+        HorizontalScrollBar.prototype.DrawRightPart = function () {
+            var w = this.TweakSize.Width;
+            var h = this.TweakSize.Height;
+            var startX = this.TweakSize.Width + this.L;
+            var x1 = startX + w / 2;
+            var y1 = 0;
+            var x2 = startX + w / 2;
+            var y2 = h;
+            var rx = w;
+            var ry = h / 2;
+            var ox = startX;
+            var oy = h / 2;
+            var sweep = 1;
+            var largeArc = 0;
+            var xaxisRotation = 0;
+            this.RightPart = this.AttachedChart.CreateArc(x1, y1, x2, y2, rx, ry, xaxisRotation, largeArc, sweep, ox, oy, this.LineWidth, this.LineColor);
+            this.RightPart.setAttribute("id", this.RightPartID);
+            var x = w;
+            var y = h / 2;
+            var trianglePath = this.AttachedChart.CreateSVGPathElement();
+            var d = "M" + x.toString() + " " + y.toString() + " " +
+                "L" + x1.toString() + " " + y1.toString() + " " +
+                "L" + x2.toString() + " " + y2.toString() + " Z";
+            trianglePath.setAttribute("id", this.RightPartTriangleID);
+            trianglePath.setAttribute("d", d);
+        };
+        HorizontalScrollBar.prototype.DrawMask = function () {
+            var x = this.AttachedChart.GetPlotX() + this.TweakSize.Width / 2;
+            var y = this.AttachedChart.GetPlotY() + this.AttachedChart.GetPlotHeight() - this.Height;
+            var w = this.TweakSize.Width + this.L;
+            var h = this.Height;
+            this.Mask = this.AttachedChart.CreateSVG(this.MaskID, "absolute", x.toString(), y.toString(), w.toString(), h.toString());
+        };
+        HorizontalScrollBar.prototype.DrawThumbnailAndPageLeftRight = function () {
+            this.CalculateThumbnailSize();
+            var r = Math.min(this.L / 10, this.Height / 5);
+            var x = this.TweakSize.Width + (this.L - this.ThumbnailSize.Width) * this.Info.Position;
+            var y = 0;
+            if (FChartHelper.ObjectIsNullOrEmpty(this.Thumbnail)) {
+                this.Thumbnail = this.AttachedChart.CreateSVGRectElement();
+            }
+            FChartHelper.SetSVGRectAttributes(this.Thumbnail, this.ThumbnailID, x.toString(), y.toString(), this.ThumbnailSize.Width.toString(), this.ThumbnailSize.Height.toString(), this.LineWidth.toString(), this.LineColor, "Black");
+            var space = this.L - this.ThumbnailSize.Width;
+            var leftSpace = space * this.Info.Position;
+            var rightSpace = space - leftSpace;
+            if (FChartHelper.ObjectIsNullOrEmpty(this.PageLeft)) {
+                this.PageLeft = this.AttachedChart.CreateSVGRectElement();
+            }
+            x = this.TweakSize.Width;
+            y = 0;
+            FChartHelper.SetSVGRectAttributes(this.PageLeft, this.PageLeftID, x.toString(), y.toString(), leftSpace.toString(), this.Height.toString(), this.LineWidth.toString(), this.LineColor, "Transparent");
+            if (FChartHelper.ObjectIsNullOrEmpty(this.PageRight)) {
+                this.PageRight = this.AttachedChart.CreateSVGRectElement();
+            }
+            x = this.TweakSize.Width + leftSpace + this.ThumbnailSize.Width;
+            y = 0;
+            FChartHelper.SetSVGRectAttributes(this.PageRight, this.PageRightID, x.toString(), y.toString(), rightSpace.toString(), this.Height.toString(), this.LineWidth.toString(), this.LineColor, "Transparent");
+        };
+        HorizontalScrollBar.prototype.FireEvent = function (eventType, scrollValue) {
+            if (scrollValue === void 0) { scrollValue = 0; }
+            for (var i = 0; i < this.EventListenerMap.length; i++) {
+                var kvp = this.EventListenerMap[i];
+                if (kvp.Key == eventType) {
+                    if (!FChartHelper.ObjectIsNullOrEmpty(kvp.Value)) {
+                        if (eventType == HorizontalScrollBarEventTypes.Scroll) {
+                            kvp.Value(scrollValue);
+                        }
+                        else {
+                            kvp.Value();
+                        }
+                    }
+                    break;
+                }
+            }
+        };
+        HorizontalScrollBar.prototype.SetScrollBarInfo = function (info) {
+            if (FChartHelper.ObjectIsNullOrEmpty(info)) {
+                return;
+            }
+            this.Info.MinValue = info.MinValue;
+            this.Info.MaxValue = info.MaxValue;
+            this.Info.ViewportRegion = info.ViewportRegion;
+            this.Info.Position = info.Position;
+            this.DrawThumbnailAndPageLeftRight();
+        };
+        HorizontalScrollBar.prototype.CalculateTweakSize = function () {
+            var r = Math.min(this.Width * 0.1, this.MaxHeight);
+            this.TweakSize = new Size(r, this.Height);
+        };
+        HorizontalScrollBar.prototype.CalculateBarLength = function () {
+            this.L = this.Width - this.TweakSize.Width * 2;
+        };
+        HorizontalScrollBar.prototype.CalculateThumbnailSize = function () {
+            this.ThumbnailSize.Height = this.Height;
+            this.ThumbnailSize.Width = this.Info.ViewportRegion.Width / this.Info.WindowRegion.Width * this.L;
+        };
+        HorizontalScrollBar.prototype.OnMouseDown = function (e) {
+            if (FChartHelper.ObjectIsNullOrEmpty(e) || FChartHelper.ObjectIsNullOrEmpty(e.toElement)) {
+                return;
+            }
+            if (e.toElement.id == this.ThumbnailID) {
+                this.ClickingOnThumbnail = true;
+                this.DraggingStartPosition = e.clientX;
+            }
+            else if (e.toElement.id == this.LeftPartTriangleID) {
+                this.FireEvent(HorizontalScrollBarEventTypes.LineLeft);
+            }
+            else if (e.toElement.id == this.RightPartTriangleID) {
+                this.FireEvent(HorizontalScrollBarEventTypes.LineRight);
+            }
+            else if (e.toElement.id == this.PageLeftID) {
+                this.FireEvent(HorizontalScrollBarEventTypes.PageLeft);
+            }
+            else if (e.toElement.id == this.PageRightID) {
+                this.FireEvent(HorizontalScrollBarEventTypes.PageRight);
+            }
+        };
+        HorizontalScrollBar.prototype.OnMouseUp = function (e) {
+            this.DraggingStartPosition = 0;
+            this.ClickingOnThumbnail = false;
+            this.Dragging = false;
+        };
+        HorizontalScrollBar.prototype.OnMouseMove = function (e) {
+            if (this.Dragging) {
+                this.ProcessDragging(e);
+                return;
+            }
+            if (this.ClickingOnThumbnail) {
+                var currentPos = 0;
+                currentPos = e.clientX;
+                var delta = Math.abs(currentPos - this.DraggingStartPosition);
+                if (delta >= this.DragThreshold) {
+                    this.Dragging = true;
+                }
+            }
+        };
+        HorizontalScrollBar.prototype.ProcessDragging = function (e) {
+            var delta = 0;
+            delta = e.clientX - this.DraggingStartPosition;
+            var space = this.L - this.ThumbnailSize.Width;
+            var leftSpace = space * this.Info.Position;
+            var rightSpace = space - leftSpace;
+            var rangePerValue = (this.Info.WindowRegion.Width - this.Info.ViewportRegion.Width) / space;
+            var rangeChange = 0;
+            if (delta > 0) {
+                delta = delta > rightSpace ? rightSpace : delta;
+                rangeChange = delta * rangePerValue;
+            }
+            else {
+                delta = Math.abs(delta);
+                delta = delta > leftSpace ? leftSpace : delta;
+                rangeChange = -delta * rangePerValue;
+            }
+            this.FireEvent(HorizontalScrollBarEventTypes.Scroll, rangeChange);
+            this.DraggingStartPosition = e.clientX;
+        };
+        return HorizontalScrollBar;
+    }(ScrollBar));
+    exports.HorizontalScrollBar = HorizontalScrollBar;
+    var VerticalScrollBar = (function (_super) {
+        __extends(VerticalScrollBar, _super);
+        function VerticalScrollBar() {
+            _super.apply(this, arguments);
+            this.MinWidth = 17;
+            this.MaxWidth = 17;
+            this.EventListenerMap = new Array();
+        }
+        VerticalScrollBar.prototype.Draw = function () {
+            if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
+                return;
+            }
+        };
+        VerticalScrollBar.prototype.DrawUpPart = function () {
+        };
+        VerticalScrollBar.prototype.DrawDownPart = function () {
+        };
+        VerticalScrollBar.prototype.DrawThumbnail = function () {
+        };
+        VerticalScrollBar.prototype.FireLineUpEvent = function () {
+            for (var i = 0; i < this.EventListenerMap.length; i++) {
+                var kvp = this.EventListenerMap[i];
+                if (kvp.Key == VerticalScrollBarEventTypes.LineUp) {
+                    if (!FChartHelper.ObjectIsNullOrEmpty(kvp.Value)) {
+                        kvp.Value();
+                    }
+                    break;
+                }
+            }
+        };
+        VerticalScrollBar.prototype.FireLineDownEvent = function () {
+            for (var i = 0; i < this.EventListenerMap.length; i++) {
+                var kvp = this.EventListenerMap[i];
+                if (kvp.Key == VerticalScrollBarEventTypes.LineDown) {
+                    if (!FChartHelper.ObjectIsNullOrEmpty(kvp.Value)) {
+                        kvp.Value();
+                    }
+                    break;
+                }
+            }
+        };
+        VerticalScrollBar.prototype.FirePageUpEvent = function () {
+            for (var i = 0; i < this.EventListenerMap.length; i++) {
+                var kvp = this.EventListenerMap[i];
+                if (kvp.Key == VerticalScrollBarEventTypes.PageUp) {
+                    if (!FChartHelper.ObjectIsNullOrEmpty(kvp.Value)) {
+                        kvp.Value();
+                    }
+                    break;
+                }
+            }
+        };
+        VerticalScrollBar.prototype.FirePageDownEvent = function () {
+            for (var i = 0; i < this.EventListenerMap.length; i++) {
+                var kvp = this.EventListenerMap[i];
+                if (kvp.Key == VerticalScrollBarEventTypes.PageDown) {
+                    if (!FChartHelper.ObjectIsNullOrEmpty(kvp.Value)) {
+                        kvp.Value();
+                    }
+                    break;
+                }
+            }
+        };
+        VerticalScrollBar.prototype.FireScrollEvent = function () {
+            for (var i = 0; i < this.EventListenerMap.length; i++) {
+                var kvp = this.EventListenerMap[i];
+                if (kvp.Key == VerticalScrollBarEventTypes.Scroll) {
+                    if (!FChartHelper.ObjectIsNullOrEmpty(kvp.Value)) {
+                        kvp.Value();
+                    }
+                    break;
+                }
+            }
+        };
+        VerticalScrollBar.prototype.SetScrollBarInfo = function (info) {
+            if (FChartHelper.ObjectIsNullOrEmpty(info)) {
+                return;
+            }
+            this.Info.MinValue = info.MinValue;
+            this.Info.MaxValue = info.MaxValue;
+            this.Info.ViewportRegion = info.ViewportRegion;
+            this.Info.Position = info.Position;
+            this.DrawThumbnail();
+        };
+        return VerticalScrollBar;
+    }(ScrollBar));
+    exports.VerticalScrollBar = VerticalScrollBar;
     var RangeControlCornerDock;
     (function (RangeControlCornerDock) {
         RangeControlCornerDock[RangeControlCornerDock["LeftTop"] = 0] = "LeftTop";
@@ -1744,6 +2148,9 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
                 return;
             }
+            if (this.IDIdentified) {
+                return;
+            }
             this.LeftDraggerID = this.AttachedChart.IdentifyID("rangecontrol-dragger-left");
             this.RightDraggerID = this.AttachedChart.IdentifyID("rangecontrol-dragger-right");
             this.LeftMaskID = this.AttachedChart.IdentifyID("svg-rangecontrol-mask-left");
@@ -1757,6 +2164,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.RightBarID = this.AttachedChart.IdentifyID("svg-rangecontrol-bar-right");
             this.TopBarID = this.AttachedChart.IdentifyID("svg-rangecontrol-bar-top");
             this.BottomBarID = this.AttachedChart.IdentifyID("svg-rangecontrol-bar-bottom");
+            this.IDIdentified = true;
         };
         Object.defineProperty(FChartRangeControl.prototype, "HorizontalBarSize", {
             get: function () {
@@ -2498,6 +2906,8 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.m_dXAxisRightMargin = this.DEFAULT_XAXIS_RIGHT_MARGIN;
             this.SortedDataSeries = false;
             this.ShowScrollBar = false;
+            this.HorizontalScrollBar = new HorizontalScrollBar();
+            this.VerticalScrollBar = new VerticalScrollBar();
             this.GridX = new FChartGrid();
             this.GridY = new FChartGrid();
             this.Tooltip = new FChartTooltip();
@@ -2776,6 +3186,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.SetWindow();
             this.Draw(true);
             this.FireZoomChanged();
+            this.SetScrollBarInfo();
         };
         FChart.prototype.ZoomOut = function () {
             var zoomFactor = this.ZoomFactor;
@@ -2791,6 +3202,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.SetWindow();
             this.Draw(true);
             this.FireZoomChanged();
+            this.SetScrollBarInfo();
         };
         FChart.prototype.ZoomToScale = function (dNewScale) {
             if (dNewScale < this.SCALE_ULIMIT) {
@@ -2816,6 +3228,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.SetWindow();
             this.Draw(true);
             this.FireZoomChanged();
+            this.SetScrollBarInfo();
         };
         FChart.prototype.ZoomToFull = function () {
             var minx = this.m_minx;
@@ -2858,6 +3271,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.SetWindow();
             this.Draw(true);
             this.FireZoomChanged();
+            this.SetScrollBarInfo();
         };
         FChart.prototype.MonitorRange = function (leftRange, rightRange) {
             var xl = this.m_uxl + (this.m_uxr - this.m_uxl) * leftRange;
@@ -2882,6 +3296,40 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                         kvp.Value(this.PlotLeftRange, this.PlotRightRange);
                     }
                 }
+            }
+        };
+        FChart.prototype.OnHorizontalScrollBarEvent = function (eventType, scrollValue) {
+            if (scrollValue === void 0) { scrollValue = 0; }
+            switch (eventType) {
+                case HorizontalScrollBarEventTypes.LineLeft:
+                    break;
+                case HorizontalScrollBarEventTypes.LineRight:
+                    break;
+                case HorizontalScrollBarEventTypes.PageLeft:
+                    break;
+                case HorizontalScrollBarEventTypes.PageRight:
+                    break;
+                case HorizontalScrollBarEventTypes.Scroll:
+                    break;
+                default:
+                    break;
+            }
+        };
+        FChart.prototype.OnVerticalScrollBarEvent = function (eventType, scrollValue) {
+            if (scrollValue === void 0) { scrollValue = 0; }
+            switch (eventType) {
+                case VerticalScrollBarEventTypes.LineUp:
+                    break;
+                case VerticalScrollBarEventTypes.LineDown:
+                    break;
+                case VerticalScrollBarEventTypes.PageUp:
+                    break;
+                case VerticalScrollBarEventTypes.PageDown:
+                    break;
+                case VerticalScrollBarEventTypes.Scroll:
+                    break;
+                default:
+                    break;
             }
         };
         FChart.prototype.ValidateContainerSize = function () {
@@ -2931,6 +3379,22 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.EventListenerMap = new Array();
             if (!FChartHelper.ObjectIsNullOrEmpty(this.ChildChart) && !FChartHelper.ObjectIsNullOrEmpty(rangeChangedHandler)) {
                 this.EventListenerMap.push(new KeyValuePair(FChartEventTypes.RangeChanged, rangeChangedHandler));
+            }
+            if (this.ShowScrollBar) {
+                if (!FChartHelper.ObjectIsNullOrEmpty(this.HorizontalScrollBar) && this.HorizontalScrollBar.Show) {
+                    this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair(HorizontalScrollBarEventTypes.LineLeft, this.OnHorizontalScrollBarEvent));
+                    this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair(HorizontalScrollBarEventTypes.LineRight, this.OnHorizontalScrollBarEvent));
+                    this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair(HorizontalScrollBarEventTypes.PageLeft, this.OnHorizontalScrollBarEvent));
+                    this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair(HorizontalScrollBarEventTypes.PageRight, this.OnHorizontalScrollBarEvent));
+                    this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair(HorizontalScrollBarEventTypes.Scroll, this.OnHorizontalScrollBarEvent));
+                }
+                if (!FChartHelper.ObjectIsNullOrEmpty(this.VerticalScrollBar) && this.VerticalScrollBar.Show) {
+                    this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair(VerticalScrollBarEventTypes.LineUp, this.OnVerticalScrollBarEvent));
+                    this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair(VerticalScrollBarEventTypes.LineDown, this.OnVerticalScrollBarEvent));
+                    this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair(VerticalScrollBarEventTypes.PageUp, this.OnVerticalScrollBarEvent));
+                    this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair(VerticalScrollBarEventTypes.PageDown, this.OnVerticalScrollBarEvent));
+                    this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair(VerticalScrollBarEventTypes.Scroll, this.OnVerticalScrollBarEvent));
+                }
             }
             for (var i = 0; i < this.XAxes.length; i++) {
                 this.XAxes[i].AttachedChart = this;
@@ -3005,6 +3469,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 this.DrawLegend();
                 this.DrawZoomControl();
                 this.DrawRangeControl();
+                this.DrawScrollBar();
             }
         };
         FChart.prototype.DrawXAxes = function () {
@@ -3165,6 +3630,42 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         FChart.prototype.DrawRangeControl = function () {
             if (this.ShowRangeControl) {
                 this.RangeControl.Draw(this);
+            }
+        };
+        FChart.prototype.DrawScrollBar = function () {
+            if (!this.ShowScrollBar) {
+                return;
+            }
+            if (!FChartHelper.ObjectIsNullOrEmpty(this.HorizontalScrollBar) && this.HorizontalScrollBar.Show) {
+                this.HorizontalScrollBar.Draw();
+            }
+            if (!FChartHelper.ObjectIsNullOrEmpty(this.VerticalScrollBar) && this.VerticalScrollBar.Show) {
+                this.VerticalScrollBar.Draw();
+            }
+        };
+        FChart.prototype.SetScrollBarInfo = function () {
+            if (!this.ShowScrollBar) {
+                return;
+            }
+            if (!FChartHelper.ObjectIsNullOrEmpty(this.HorizontalScrollBar) && this.HorizontalScrollBar.Show) {
+                var info = new ScrollBarInfo();
+                info.MinValue = 0;
+                info.MaxValue = (this.m_maxx - this.m_minx) - (this.m_xr - this.m_xl);
+                info.ViewportRegion = new Size((this.m_xr - this.m_xl), (this.m_yt - this.m_yb));
+                info.ViewportSize = new Size(this.GetPlotWidth(), this.GetPlotHeight());
+                info.WindowRegion = new Size((this.m_maxx - this.m_minx), (this.m_maxy - this.m_miny));
+                info.Position = Math.abs(this.m_xl - this.m_minx) / info.MaxValue;
+                this.HorizontalScrollBar.SetScrollBarInfo(info);
+            }
+            if (!FChartHelper.ObjectIsNullOrEmpty(this.VerticalScrollBar) && this.VerticalScrollBar.Show) {
+                var info = new ScrollBarInfo();
+                info.MinValue = 0;
+                info.MaxValue = (this.m_maxy - this.m_miny) - (this.m_yt - this.m_yb);
+                info.ViewportRegion = new Size((this.m_xr - this.m_xl), (this.m_yt - this.m_yb));
+                info.ViewportSize = new Size(this.GetPlotWidth(), this.GetPlotHeight());
+                info.WindowRegion = new Size((this.m_maxx - this.m_minx), (this.m_maxy - this.m_miny));
+                info.Position = 1 - Math.abs(this.m_yb - this.m_miny) / info.MaxValue;
+                this.VerticalScrollBar.SetScrollBarInfo(info);
             }
         };
         FChart.prototype.ShowTooltip = function () {
