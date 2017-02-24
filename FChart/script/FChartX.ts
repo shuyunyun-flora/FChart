@@ -85,6 +85,8 @@ import _ = require("lodash");
         RangeChanged
     }
 
+    var N_VALID_DECIMAL: number = 6;
+
     class ChartGraphObject {
         public AttachedChart: FChart = null;
         public Key: string = "";
@@ -442,15 +444,6 @@ import _ = require("lodash");
         private MarginBetweenTickAndLabel: number = 0;
         private MaxTickLabelWidth: number = 0;
 
-        private m_dPlotY: number = 0;
-        public get PlotY() {
-            return this.m_dPlotY * (this.Zoomable ? this.AttachedChart.ZoomLevel : 1);
-        }
-
-        public set PlotY(value: number) {
-            this.m_dPlotY = value;
-        }
-
         constructor() {
             super();
             this.Type = ChartAxisType.YAxis;
@@ -602,6 +595,35 @@ import _ = require("lodash");
             FChartHelper.SetSVGTextAttributes(text, "yaxis-title-" + this.ID, x.toString(), y.toString(), this.Title.Label, "middle", this.Title.FontFamily, this.Title.FontStyle, this.Title.FontSize.toString(), this.Title.FontWeight, this.FontColor, transform);
             svg.appendChild(text);
         }
+
+        public get YDiff(): number {
+            let yDiff: number = 0;
+            let iMultiple: number = 1;
+
+            if (this.BottomEnvelopeLine.Show) {
+                switch (this.BottomEnvelopeLine.Gradient) {
+                    case EnvelopeLineGradient.One:
+                        iMultiple = 1;
+                        break;
+
+                    case EnvelopeLineGradient.OneHalf:
+                        iMultiple = 2;
+                        break;
+
+                    case EnvelopeLineGradient.OneFourth:
+                        iMultiple = 4;
+                        break;
+                    default:
+                        break;
+                }
+
+                if (this.TopEnvelopeLine.Show) {
+                    iMultiple *= 2;
+                }
+                yDiff = this.Tick.Scale / iMultiple;
+            }
+            return yDiff;
+        }
     }
 
     export class DataPoint {
@@ -629,6 +651,34 @@ import _ = require("lodash");
         constructor(w: number, h: number) {
             this.Width = w;
             this.Height = h;
+        }
+    }
+
+    class Region {
+        public X1: number = 0;
+        public Y1: number = 0;
+        public X2: number = 0;
+        public Y2: number = 0;
+
+        public constructor(x1: number, y1: number, x2: number, y2: number) {
+            this.X1 = x1;
+            this.Y1 = y1;
+            this.X2 = x2;
+            this.Y2 = y2;
+        }
+
+        public get Width(): number {
+            let w: number = Math.abs(this.X2 - this.X1);
+            w = FChartHelper.RoundFloatNumber(w, N_VALID_DECIMAL);
+
+            return w;
+        }
+
+        public get Height(): number {
+            let h: number = Math.abs(this.Y1 - this.Y2);
+            h = FChartHelper.RoundFloatNumber(h, N_VALID_DECIMAL);
+
+            return h;
         }
     }
 
@@ -666,7 +716,7 @@ import _ = require("lodash");
                 let iy: number = chart.m_coeff.ToDvcY(y);
                 let pt: SVGPoint = svgPlot.createSVGPoint();
                 pt.x = chart.XAxisLeftMargin + ix;
-                pt.y = iy - yaxis.PlotY;
+                pt.y = iy;
                 serieLine.points.appendItem(pt);
             }
 
@@ -685,7 +735,7 @@ import _ = require("lodash");
                     // Draw mark.
                     this.Mark.Key = this.XAxisID + "-" + this.YAxisID + "-" + this.ZOrder.toString() + "-Mark-" + i.toString();
                     this.Mark.X = ix;
-                    this.Mark.Y = iy - yaxis.PlotY;
+                    this.Mark.Y = iy;
                     this.Mark.Draw(chart);
                 }
             }
@@ -1221,6 +1271,7 @@ import _ = require("lodash");
         private DefaultShortSize: number = 30;
         private DefaultLongSize: number = 300;
         private MaxBarSize: number = 16;
+        private ThumbnailSize: Size = new Size(0, 0);
         public ShortSize: number = 0;
         public LongSize: number = 0;
 
@@ -1289,12 +1340,11 @@ import _ = require("lodash");
             this.IDIdentified = true;
         }
 
-        private DraggerScale: number = 0;
-        private DraggerBigScale: number = 0;
         private CircleRadius: number = 0;
         private DraggerX: number = 0;
         private DraggerY: number = 0;
-        private Length: number = 0;
+        private L: number = 0;
+        private D: number = 0;
 
         public IsVisible(): boolean {
             if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
@@ -1322,16 +1372,28 @@ import _ = require("lodash");
             }
         }
 
-        public Draw(chart: FChart): void {
-            this.AttachedChart = chart;
-            this.IdentifyID();
+        private CalculateCircleRadiusAndThumbnailSize(): void {
+            if (this.Orientation == Orientation.Horizontal) {
+                let w: number = this.LongSize;
+                let h: number = this.ShortSize;
+                w -= this.Margin;
+                h -= this.Margin;
 
-            let svgZoomControl: SVGSVGElement = chart.GetSVGSVGElementByID(this.ID);
-            if (FChartHelper.ObjectIsNullOrEmpty(svgZoomControl)) {
-                return;
+                let mx: number = this.Margin / 2;
+                let my: number = this.Margin / 2;
+                let twothOfH: number = h / 2;
+                let eighthOfW: number = w / 8;
+
+                let r: number = Math.min(eighthOfW / 2, twothOfH / 2);
+                this.CircleRadius = r;
+                this.D = h / 2 + (h / 2 - r * 2);
+
+                let wb: number = w - 4 * r;
+                let tw: number = Math.min(wb / 10, this.MaxBarSize);
+                this.ThumbnailSize = new Size(tw, r * 2);
+                this.L = wb - tw;
             }
-
-            if (this.Layout == ZoomControlLayout.Left || this.Layout == ZoomControlLayout.Right) {
+            else {
                 let w: number = this.ShortSize;
                 let h: number = this.LongSize;
                 w -= this.Margin;
@@ -1344,10 +1406,96 @@ import _ = require("lodash");
 
                 let r: number = Math.min(eighthOfH / 2, twothOfW / 2);
                 this.CircleRadius = r;
+                this.D = w / 2 + (w / 2 - r * 2);
+
                 let hb: number = h - 4 * r;
-                this.Length = hb;
+                let th: number = Math.min(hb / 10, this.MaxBarSize);
+                this.ThumbnailSize = new Size(r * 2, th);
+                this.L = hb - th;
+            }
+        }
+
+        public Draw(chart: FChart): void {
+            this.AttachedChart = chart;
+            this.IdentifyID();
+
+            let svgZoomControl: SVGSVGElement = chart.GetSVGSVGElementByID(this.ID);
+            if (FChartHelper.ObjectIsNullOrEmpty(svgZoomControl)) {
+                return;
+            }
+
+            this.CalculateCircleRadiusAndThumbnailSize();
+            let mx: number = this.Margin / 2;
+            let my: number = this.Margin / 2;
+            let r: number = this.CircleRadius;
+            let d: number = 0;
+            if (this.Orientation == Orientation.Horizontal) {
+                d = this.ThumbnailSize.Height;
+                let cx1: number = mx + 2 * r + this.L + this.ThumbnailSize.Width + r;
+                let cy1: number = my + this.D + r;
+                let circle1: SVGCircleElement = chart.CreateSVGCircleElement();
+                FChartHelper.SetSVGCircleAttributes(circle1, this.ZoomInHolderID, cx1.toString(), cy1.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
+
+                let ix1: number = mx + 2 * r + this.L + this.ThumbnailSize.Width;
+                let iy1: number = my + this.D + r;
+                let ix2: number = ix1 + 2 * r;
+                let iy2: number = iy1;
+                let lineP1: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP1, this.ZoomInHolderL1ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP1);
+                ix1 = ix1 + r;
+                ix2 = ix1;
+                iy1 = my + this.D;
+                iy2 = iy1 + 2 * r;
+                let lineP2: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP2, this.ZoomInHolderL2ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP2);
+                svgZoomControl.appendChild(circle1);
+                this.ZoomInHolder = circle1;
+
+                let cx2: number = mx + r;
+                let cy2: number = my + this.D + r;
+                let circle2: SVGCircleElement = chart.CreateSVGCircleElement();
+                FChartHelper.SetSVGCircleAttributes(circle2, this.ZoomOutHolderID, cx2.toString(), cy2.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
+
+                ix1 = mx + r;
+                ix2 = ix1;
+                iy1 = my + this.D;
+                iy2 = iy1 + 2 * r;
+                let lineP3: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP3, this.ZoomOutHolderL1ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP3);
+                svgZoomControl.appendChild(circle2);
+                this.ZoomOutHolder = circle2;
+
+                let lx1: number = mx + 2 * r;
+                let ly1: number = my + this.D + r;
+                let lx2: number = lx1 + this.L + this.ThumbnailSize.Width;
+                let ly2: number = ly1;
+                let progressBar: SVGLineElement = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(progressBar, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(progressBar);
+                this.ProgressBarHolder = progressBar;
+
+                let dragger: SVGPathElement = chart.CreateSVGPathElement();
+                FChartHelper.SetSVGPathAttributes(dragger, this.DraggerHolderID, "", this.LineWidth.toString(), this.LineColor, this.LineColor);
+                svgZoomControl.appendChild(dragger);
+                this.DraggerHolder = dragger;
+                this.UpdateDraggerData();
+
+                let tx: number = mx + 2 * r + (this.L + this.ThumbnailSize.Width) / 2;
+                let ty: number = my + this.D / 2;
+                let dLabelFontSize: number = this.FontSize;
+                ty += (dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2);
+                let strLabel: string = chart.ZoomLevel.toFixed(2);
+                let text: SVGTextElement = chart.CreateSVGTextElement();
+                FChartHelper.SetSVGTextAttributes(text, this.LabelHolderID, tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor);
+                svgZoomControl.appendChild(text);
+                this.LabelHolder = text;
+            }
+            else {
                 let cx1: number = mx + r;
-                let cy1: number = my + 2 * r - r;
+                let cy1: number = my + r;
                 let circle1: SVGCircleElement = chart.CreateSVGCircleElement();
                 FChartHelper.SetSVGCircleAttributes(circle1, this.ZoomInHolderID, cx1.toString(), cy1.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
 
@@ -1369,11 +1517,11 @@ import _ = require("lodash");
                 this.ZoomInHolder = circle1;
 
                 let cx2: number = mx + r;
-                let cy2: number = my + 2 * r + hb + r;
+                let cy2: number = my + 2 * r + this.L + this.ThumbnailSize.Height + r;
                 let circle2: SVGCircleElement = chart.CreateSVGCircleElement();
                 FChartHelper.SetSVGCircleAttributes(circle2, this.ZoomOutHolderID, cx2.toString(), cy2.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
 
-                iy1 = my + 2 * r + hb + r;
+                iy1 = my + 2 * r + this.L + this.ThumbnailSize.Height + r;
                 iy2 = iy1;
                 let lineP3: SVGLineElement = chart.CreateSVGLineElement();
                 FChartHelper.SetSVGLineAttributes(lineP3, this.ZoomOutHolderL1ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
@@ -1384,23 +1532,20 @@ import _ = require("lodash");
                 let lx1: number = cx1;
                 let ly1: number = my + 2 * r;
                 let lx2: number = cx1;
-                let ly2: number = my + 2 * r + hb;
+                let ly2: number = my + 2 * r + this.L + this.ThumbnailSize.Height;
                 let progressBar: SVGLineElement = chart.CreateSVGLineElement();
                 FChartHelper.SetSVGLineAttributes(progressBar, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
                 svgZoomControl.appendChild(progressBar);
                 this.ProgressBarHolder = progressBar;
 
                 let dragger: SVGPathElement = chart.CreateSVGPathElement();
-                dragger.setAttribute("id", this.DraggerHolderID);                
-                dragger.setAttribute("stroke-width", this.LineWidth.toString());
-                dragger.setAttribute("stroke", this.LineColor);
-                dragger.setAttribute("fill", this.LineColor);
+                FChartHelper.SetSVGPathAttributes(dragger, this.DraggerHolderID, "", this.LineWidth.toString(), this.LineColor, this.LineColor);
                 svgZoomControl.appendChild(dragger);
                 this.DraggerHolder = dragger;
                 this.UpdateDraggerData();
 
-                let tx: number = mx + r * 2 + twothOfW;
-                let ty: number = my + 2 * r + hb / 2;
+                let tx: number = mx + r * 2 + this.D;
+                let ty: number = my + 2 * r + (this.L + this.ThumbnailSize.Height) / 2;
                 let dLabelFontSize: number = this.FontSize;
                 ty += (dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2);
                 let strLabel: string = chart.ZoomLevel.toFixed(2);
@@ -1410,86 +1555,7 @@ import _ = require("lodash");
                 svgZoomControl.appendChild(text);
                 this.LabelHolder = text;
             }
-            else {
-                let w: number = this.LongSize;
-                let h: number = this.ShortSize;
-                w -= this.Margin;
-                h -= this.Margin;
-
-                let mx: number = this.Margin / 2;
-                let my: number = this.Margin / 2;
-                let twothOfH: number = h / 2;
-                let eighthOfW: number = w / 8;
-
-                let r: number = Math.min(eighthOfW / 2, twothOfH / 2);
-                this.CircleRadius = r;
-                let wb: number = w - 4 * r;
-                this.Length = wb;
-                let cx1: number = mx + r;
-                let cy1: number = my + twothOfH + r;
-                let circle1: SVGCircleElement = chart.CreateSVGCircleElement();
-                FChartHelper.SetSVGCircleAttributes(circle1, this.ZoomInHolderID, cx1.toString(), cy1.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
-
-                let ix1: number = mx;
-                let iy1: number = my + twothOfH + r;
-                let ix2: number = mx + 2 * r;
-                let iy2: number = iy1;
-                let lineP1: SVGLineElement = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(lineP1, this.ZoomInHolderL1ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(lineP1);
-                ix1 = mx + r;
-                ix2 = ix1;
-                iy1 = my + twothOfH;
-                iy2 = iy1 + 2 * r;
-                let lineP2: SVGLineElement = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(lineP2, this.ZoomInHolderL2ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(lineP2);
-                svgZoomControl.appendChild(circle1);
-                this.ZoomInHolder = circle1;
-
-                let cx2: number = mx + 2 * r + wb + r;
-                let cy2: number = my + twothOfH + r;
-                let circle2: SVGCircleElement = chart.CreateSVGCircleElement();
-                FChartHelper.SetSVGCircleAttributes(circle2, this.ZoomOutHolderID, cx2.toString(), cy2.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
-
-                ix1 = mx + 2 * r + wb + r;
-                ix2 = ix1;
-                iy1 = my + twothOfH;
-                iy2 = iy1 + 2 * r;
-                let lineP3: SVGLineElement = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(lineP3, this.ZoomOutHolderL1ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(lineP3);
-                svgZoomControl.appendChild(circle2);
-                this.ZoomOutHolder = circle2;
-
-                let lx1: number = mx + 2 * r;
-                let ly1: number = my + twothOfH + r;
-                let lx2: number = lx1 + wb;
-                let ly2: number = ly1;
-                let progressBar: SVGLineElement = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(progressBar, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(progressBar);
-                this.ProgressBarHolder = progressBar;
-
-                let dragger: SVGPathElement = chart.CreateSVGPathElement();
-                dragger.setAttribute("id", this.DraggerHolderID);
-                dragger.setAttribute("stroke-width", this.LineWidth.toString());
-                dragger.setAttribute("stroke", this.LineColor);
-                dragger.setAttribute("fill", this.LineColor);
-                svgZoomControl.appendChild(dragger);
-                this.DraggerHolder = dragger;
-                this.UpdateDraggerData();
-
-                let tx: number = mx + 2 * r + wb / 2;
-                let ty: number = my + twothOfH / 2;
-                let dLabelFontSize: number = this.FontSize;
-                ty += (dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2);
-                let strLabel: string = chart.ZoomLevel.toFixed(2);
-                let text: SVGTextElement = chart.CreateSVGTextElement();
-                FChartHelper.SetSVGTextAttributes(text, this.LabelHolderID, tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor);
-                svgZoomControl.appendChild(text);
-                this.LabelHolder = text;
-            }
+            
 
             this.ZoomInHolder.addEventListener("mouseout", (e) => { this.ClearTimer(); });
             this.ZoomOutHolder.addEventListener("mouseout", (e) => { this.ClearTimer(); });
@@ -1513,21 +1579,14 @@ import _ = require("lodash");
         private Step: number = 10;
 
         private Zoom(delta: number): boolean {
+            if (delta == 0) {
+                return false;
+            }
+
             if (this.Orientation == Orientation.Horizontal) {
-                let left: number = 0;
-                let right: number = 0;
-                let len: number = this.AttachedChart.MaxZoomLevel * this.DraggerBigScale;
-                let strX: string = this.DraggerHolder.getAttribute("x");
-                let x: number = parseFloat(strX);
-                let mx: number = this.Margin / 2;
-                let x1: number = mx + 2 * this.CircleRadius;
-                let x2: number = x1 + len + 2 * this.CircleRadius;
-                let offsetX: number = mx + this.CircleRadius * 2;
-                left = this.DraggerX - offsetX - this.DraggerScale;
-                right = offsetX + len - this.DraggerX - this.DraggerScale;
-                if (delta == 0) {
-                    return false;
-                }
+                let left: number = this.DraggerX - this.Margin / 2 - this.CircleRadius * 2;
+                let right: number = this.L - left;
+
                 if (delta < 0) {
                     if (left == 0) {
                         return false;
@@ -1545,17 +1604,9 @@ import _ = require("lodash");
                 }
             }
             else {
-                let bottom: number = 0;
-                let top: number = 0;
-                let len: number = this.AttachedChart.MaxZoomLevel * this.DraggerBigScale;
-                let my: number = this.Margin / 2;
-                let offsetY: number = my + this.CircleRadius * 2;
-                bottom = offsetY + len - this.DraggerY - this.DraggerScale;
-                top = this.DraggerY - offsetY - this.DraggerScale;
+                let top: number = (this.DraggerY - this.Margin / 2 - this.CircleRadius * 2);
+                let bottom: number = this.L - top;
 
-                if (delta == 0) {
-                    return false;
-                }
                 if (delta > 0) {
                     if (bottom == 0) {
                         return false;
@@ -1582,53 +1633,39 @@ import _ = require("lodash");
             if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
                 return;
             }
-            this.Zoom(-this.Step);
+            let step: number = this.Orientation == Orientation.Horizontal ? this.Step : -this.Step;
+            this.Zoom(step);
         }
 
         private OnZoomOut(e): void {
             if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
                 return;
             }
-            this.Zoom(this.Step);
+            let step: number = this.Orientation == Orientation.Horizontal ? -this.Step : this.Step;
+            this.Zoom(step);
         }
 
         private UpdateDraggerData(): void {
-            let length: number = 0;
-            if (this.Orientation == Orientation.Horizontal) {
-                length = this.ProgressBarHolder.x2.baseVal.value - this.ProgressBarHolder.x1.baseVal.value;
-            }
-            else {
-                length = this.ProgressBarHolder.y2.baseVal.value - this.ProgressBarHolder.y1.baseVal.value;
-            }
-            let scale: number = length / this.AttachedChart.MaxZoomLevel;
-            let exponent: number = 0;
-            while (scale > this.MaxBarSize / 2) {
-                scale /= 2;
-                exponent++;
-            }
-            let bigScale: number = scale * Math.pow(2, exponent);
-            this.DraggerScale = scale;
-            this.DraggerBigScale = bigScale;
-            let delta: number = bigScale == scale ? 0 : scale;
+            let maxZoomLevel: number = this.AttachedChart.MaxZoomLevel - 1;
+            let scale: number = this.L / maxZoomLevel;
             let mx: number = this.Margin / 2;
             let my: number = this.Margin / 2;
             let r: number = this.CircleRadius;
 
             if (this.Orientation == Orientation.Horizontal) {
-                let twothOfH: number = this.ShortSize / 2;
-                let bx: number = mx + 2 * r + this.AttachedChart.ZoomLevel * bigScale - delta;
-                let by: number = my + twothOfH + r;
+                let bx: number = mx + 2 * r + (this.AttachedChart.ZoomLevel - 1) * scale;
+                let by: number = my + this.D;
                 this.DraggerX = bx;
                 this.DraggerY = by;
 
-                let bx1: number = bx - scale;
-                let by1: number = by - r;
-                let bx2: number = bx + scale;
-                let by2: number = by - r;
-                let bx3: number = bx + scale;
-                let by3: number = by + r;
-                let bx4: number = bx - scale;
-                let by4: number = by + r;
+                let bx1: number = bx;
+                let by1: number = by;
+                let bx2: number = bx + this.ThumbnailSize.Width;
+                let by2: number = by;
+                let bx3: number = bx + this.ThumbnailSize.Width;
+                let by3: number = by + this.ThumbnailSize.Height;
+                let bx4: number = bx;
+                let by4: number = by + this.ThumbnailSize.Height;
   
                 let d: string = "M" + bx1.toString() + " " + by1.toString() + " " +
                     "L" + bx2.toString() + " " + by2.toString() + " " +
@@ -1638,19 +1675,19 @@ import _ = require("lodash");
                 this.DraggerHolder.setAttribute("d", d);
             }
             else {
-                let bx: number = mx + r;
-                let by: number = my + 2 * r + (length - (this.AttachedChart.ZoomLevel * bigScale - delta));
+                let bx: number = mx;
+                let by: number = my + 2 * r + (this.L - (this.AttachedChart.ZoomLevel - 1) * scale);
                 this.DraggerX = bx;
                 this.DraggerY = by;
 
-                let bx1: number = bx - r;
-                let by1: number = by - scale;
-                let bx2: number = bx + r;
-                let by2: number = by - scale;
-                let bx3: number = bx + r;
-                let by3: number = by + scale;
-                let bx4: number = bx - r;
-                let by4: number = by + scale;
+                let bx1: number = bx;
+                let by1: number = by;
+                let bx2: number = bx + this.ThumbnailSize.Width;
+                let by2: number = by;
+                let bx3: number = bx + this.ThumbnailSize.Width;
+                let by3: number = by + this.ThumbnailSize.Height;
+                let bx4: number = bx;
+                let by4: number = by + this.ThumbnailSize.Height;
                 let d: string = "M" + bx1.toString() + " " + by1.toString() + " " +
                     "L" + bx2.toString() + " " + by2.toString() + " " +
                     "L" + bx3.toString() + " " + by3.toString() + " " +
@@ -1676,16 +1713,18 @@ import _ = require("lodash");
 
         private get ZoomValue(): number {
             let zoomValue: number = 0;
-            let length: number = 0;
+            let maxZoomLevel: number = this.AttachedChart.MaxZoomLevel - 1;
             if (this.Orientation == Orientation.Horizontal) {
-                length = this.ProgressBarHolder.x2.baseVal.value - this.ProgressBarHolder.x1.baseVal.value;
-                zoomValue = (this.DraggerX - this.ProgressBarHolder.x1.baseVal.value - this.DraggerScale) / length * this.AttachedChart.MaxZoomLevel;
+                let space: number = this.DraggerX - this.Margin / 2 - this.CircleRadius * 2;
+                zoomValue = space / this.L * maxZoomLevel;
             }
             else {
-                length = this.ProgressBarHolder.y2.baseVal.value - this.ProgressBarHolder.y1.baseVal.value;
-                zoomValue = (length - (this.DraggerY - this.ProgressBarHolder.y1.baseVal.value - this.DraggerScale)) / length * this.AttachedChart.MaxZoomLevel;
+                let space: number = this.DraggerY - this.Margin / 2 - this.CircleRadius * 2;
+                space = this.L - space;
+                zoomValue = space / this.L * maxZoomLevel;
             }
 
+            zoomValue += 1;
             return zoomValue;
         }
 
@@ -1753,17 +1792,13 @@ import _ = require("lodash");
 
         private ProcessDragging(e: MouseEvent) {
             let delta: number = 0;
-
             if (this.Orientation == Orientation.Horizontal) {
                 delta = e.clientX - this.DraggingStartPosition;
             }
             else {
                 delta = e.clientY - this.DraggingStartPosition;
             }
-            let changeStart: boolean = this.Zoom(delta);
-            if (!changeStart) {
-                return;
-            }
+            this.Zoom(delta);
 
             if (this.Orientation == Orientation.Horizontal) {
                 this.DraggingStartPosition = e.clientX;
@@ -1779,7 +1814,9 @@ import _ = require("lodash");
         LineRight,
         PageLeft,
         PageRight,
-        Scroll
+        Scroll,
+        Show,
+        Hide
     }
 
     enum VerticalScrollBarEventTypes {
@@ -1787,16 +1824,37 @@ import _ = require("lodash");
         LineDown,
         PageUp,
         PageDown,
-        Scroll
+        Scroll,
+        Show,
+        Hide
     }
 
     class ScrollBarInfo {
         public MinValue: number = 0;
         public MaxValue: number = 0;
-        public ViewportRegion: Size = new Size(0, 0);
-        public ViewportSize: Size = new Size(0, 0);
-        public WindowRegion: Size = new Size(0, 0);
         public Position: number = 0;
+
+        private m_ViewportRegion: Region = new Region(0, 0, 0, 0);
+        public get ViewportRegion(): Region {
+            return this.m_ViewportRegion;
+        }
+        public set ViewportRegion(region: Region) {
+            this.m_ViewportRegion = region;
+        }
+        private m_ViewportSize: Size = new Size(0, 0);
+        public get ViewportSize(): Size {
+            return this.m_ViewportSize;
+        }
+        public set ViewportSize(size: Size) {
+            this.m_ViewportSize = size;
+        }
+        private m_WindowRegion: Region = new Region(0, 0, 0, 0);
+        public get WindowRegion(): Region {
+            return this.m_WindowRegion;
+        }
+        public set WindowRegion(region: Region) {
+            this.m_WindowRegion = region;
+        }
     }
 
     class ScrollBar extends ChartGraphObject {
@@ -1806,8 +1864,12 @@ import _ = require("lodash");
         protected TweakSize: Size = new Size(0, 0);
         protected ThumbnailSize: Size = new Size(0, 0);
         protected ThumbnailColor: string = "black";
-        protected Info: ScrollBarInfo = new ScrollBarInfo();
+        private m_info: ScrollBarInfo = new ScrollBarInfo();
+        public get Info(): ScrollBarInfo {
+            return this.m_info;
+        }
         protected Initialized: boolean = false;
+        protected m_bVisible: boolean = false;
 
         constructor() {
             super();
@@ -1890,17 +1952,7 @@ import _ = require("lodash");
             }
 
             this.AttachedChart = chart;
-            if (!FChartHelper.ObjectIsNullOrEmpty(this.Presentation)) {
-                this.Presentation.innerHTML = "";
-            }
-
-            this.LeftPart = null;
-            this.RightPart = null;
-            this.LeftPartTriangle = null;
-            this.RightPartTriangle = null;
-            this.PageLeft = null;
-            this.PageRight = null;
-            this.Thumbnail = null;
+            this.Clear();
 
             let w: number = this.AttachedChart.GetPlotWidth();
             let h: number = this.AttachedChart.GetPlotHeight();
@@ -1921,7 +1973,9 @@ import _ = require("lodash");
             this.DrawRightPart();
             this.DrawThumbnailAndPageLeftPageRight();
 
-            this.Visible ? this.ShowControl() : this.HideControl();
+            if (!this.Visible) {
+                this.Visible ? this.ShowControl() : this.HideControl();
+            }
         }
 
         protected IdentifyID(): void {
@@ -1942,6 +1996,22 @@ import _ = require("lodash");
             this.PageRightID = this.AttachedChart.IdentifyID(this.PageRightID);
 
             this.IDIdentified = true;
+        }
+
+        private Clear(): void {
+            if (!FChartHelper.ObjectIsNullOrEmpty(this.Presentation)) {
+                this.Presentation.innerHTML = "";
+            }
+
+            this.LeftPart = null;
+            this.RightPart = null;
+            this.LeftPartTriangle = null;
+            this.RightPartTriangle = null;
+            this.PageLeft = null;
+            this.PageRight = null;
+            this.Thumbnail = null;
+
+            this.AttachedChart.RemoveSVGFromContainer(this.Presentation);
         }
 
         private DrawLeftPart(): void {
@@ -2066,7 +2136,9 @@ import _ = require("lodash");
                 this.DrawThumbnailAndPageLeftPageRight();
             }
 
-            this.Visible ? this.ShowControl() : this.HideControl();
+            if (this.Visible != this.m_bVisible) {
+                this.Visible ? this.ShowControl() : this.HideControl();
+            }
         }
 
         private get IsVerticalScrollBarVisible(): boolean {
@@ -2078,7 +2150,8 @@ import _ = require("lodash");
         }
 
         private get VerticalScrollBarWidth(): number {
-            if (this.IsVerticalScrollBarVisible) {
+            if (!this.IsVerticalScrollBarVisible) {
+                return 0;
             }
             let w: number = Math.min(this.AttachedChart.GetPlotWidth() * 0.1, this.MaxHeight);
             return w;
@@ -2098,6 +2171,8 @@ import _ = require("lodash");
             this.ThumbnailSize.Width = this.Info.ViewportRegion.Width / this.Info.WindowRegion.Width * this.L;
         }
 
+        private SuppressVisibilityChange: boolean = false;
+
         protected ShowControl(): void {
             if (!this.Initialized) {
                 return;
@@ -2110,6 +2185,11 @@ import _ = require("lodash");
             this.PageLeft.setAttribute("opacity", this.Opacity.toString());
             this.PageRight.setAttribute("opacity", this.Opacity.toString());
             this.Thumbnail.setAttribute("opacity", this.Opacity.toString());
+            this.m_bVisible = true;
+
+            if (!this.SuppressVisibilityChange) {
+                this.FireEvent(HorizontalScrollBarEventTypes.Show);
+            }
 
             super.ShowControl();
         }
@@ -2126,12 +2206,26 @@ import _ = require("lodash");
             this.PageLeft.setAttribute("opacity", "0");
             this.PageRight.setAttribute("opacity", "0");
             this.Thumbnail.setAttribute("opacity", "0");
+            this.m_bVisible = false;
+
+            if (!this.SuppressVisibilityChange) {
+                this.FireEvent(HorizontalScrollBarEventTypes.Hide);
+            }
 
             super.HideControl();
         }
 
         protected get Visible(): boolean {
+
             return (this.Info.WindowRegion.Width > this.Info.ViewportRegion.Width);
+        }
+
+        public OnVerticalScrollBarVisibilityChange(bVisible: boolean) {
+            this.SuppressVisibilityChange = true;
+            if (this.Initialized && this.Visible) {
+                this.Draw(this.AttachedChart);
+            }
+            this.SuppressVisibilityChange = false;
         }
 
         private ClickingOnThumbnail: boolean = false;
@@ -2242,17 +2336,7 @@ import _ = require("lodash");
             }
 
             this.AttachedChart = chart;
-            if (!FChartHelper.ObjectIsNullOrEmpty(this.Presentation)) {
-                this.Presentation.innerHTML = "";
-            }
-
-            this.UpPart = null;
-            this.DownPart = null;
-            this.UpPartTriangle = null;
-            this.DownPartTriangle = null;
-            this.PageUp = null;
-            this.PageDown = null;
-            this.Thumbnail = null;
+            this.Clear();
 
             let w: number = this.AttachedChart.GetPlotWidth();
             let h: number = this.AttachedChart.GetPlotHeight();
@@ -2273,7 +2357,9 @@ import _ = require("lodash");
             this.DrawDownPart();
             this.DrawThumbnailAndPageUpPageDown();
 
-            this.Visible ? this.ShowControl() : this.HideControl();
+            if (!this.Visible) {
+                this.Visible ? this.ShowControl() : this.HideControl();
+            }
         }
 
         protected IdentifyID(): void {
@@ -2294,6 +2380,22 @@ import _ = require("lodash");
             this.PageDownID = this.AttachedChart.IdentifyID(this.PageDownID);
 
             this.IDIdentified = true;
+        }
+
+        private Clear(): void {
+            if (!FChartHelper.ObjectIsNullOrEmpty(this.Presentation)) {
+                this.Presentation.innerHTML = "";
+            }
+
+            this.UpPart = null;
+            this.DownPart = null;
+            this.UpPartTriangle = null;
+            this.DownPartTriangle = null;
+            this.PageUp = null;
+            this.PageDown = null;
+            this.Thumbnail = null;
+
+            this.AttachedChart.RemoveSVGFromContainer(this.Presentation);
         }
 
         private DrawUpPart(): void {
@@ -2326,7 +2428,7 @@ import _ = require("lodash");
         private DrawDownPart(): void {
             let w: number = this.TweakSize.Width;
             let h: number = this.TweakSize.Height;
-            let startY: number = this.TweakSize.Width / 2 + this.L;
+            let startY: number = this.TweakSize.Height / 2 + this.L;
             let x1: number = 0;
             let y1: number = startY;
             let x2: number = w;
@@ -2417,7 +2519,10 @@ import _ = require("lodash");
             if (this.Initialized && this.Visible) {
                 this.DrawThumbnailAndPageUpPageDown();
             }
-            this.Visible ? this.ShowControl() : this.HideControl();
+
+            if (this.Visible != this.m_bVisible) {
+                this.Visible ? this.ShowControl() : this.HideControl();
+            }
         }
 
         private get IsHorizontalScrollBarVisible(): boolean {
@@ -2429,7 +2534,8 @@ import _ = require("lodash");
         }
 
         private get HorizontalScrollBarHeight(): number {
-            if (this.IsHorizontalScrollBarVisible) {
+            if (!this.IsHorizontalScrollBarVisible) {
+                return 0;
             }
             let h: number = Math.min(this.AttachedChart.GetPlotHeight() * 0.1, this.MaxWidth);
             return h;
@@ -2449,6 +2555,8 @@ import _ = require("lodash");
             this.ThumbnailSize.Width = this.Width;
         }
 
+        private SuppressVisibilityChange: boolean = false;
+
         protected ShowControl(): void {
             if (!this.Initialized) {
                 return;
@@ -2461,6 +2569,11 @@ import _ = require("lodash");
             this.PageUp.setAttribute("opacity", this.Opacity.toString());
             this.PageDown.setAttribute("opacity", this.Opacity.toString());
             this.Thumbnail.setAttribute("opacity", this.Opacity.toString());
+            this.m_bVisible = true;
+
+            if (!this.SuppressVisibilityChange) {
+                this.FireEvent(VerticalScrollBarEventTypes.Show);
+            }
 
             super.ShowControl();
         }
@@ -2477,12 +2590,25 @@ import _ = require("lodash");
             this.PageUp.setAttribute("opacity", "0");
             this.PageDown.setAttribute("opacity", "0");
             this.Thumbnail.setAttribute("opacity", "0");
+            this.m_bVisible = false;
+
+            if (!this.SuppressVisibilityChange) {
+                this.FireEvent(VerticalScrollBarEventTypes.Hide);
+            }
 
             super.HideControl();
         }
 
         protected get Visible(): boolean {
             return (this.Info.WindowRegion.Height > this.Info.ViewportRegion.Height);
+        }
+
+        public OnHorizontalScrollBarVisibilityChange(bVisible: boolean) {
+            this.SuppressVisibilityChange = true;
+            if (this.Initialized && this.Visible) {
+                this.Draw(this.AttachedChart);
+            }
+            this.SuppressVisibilityChange = false;
         }
 
         private ClickingOnThumbnail: boolean = false;
@@ -3212,6 +3338,10 @@ import _ = require("lodash");
             if (dValue == 0) {
                 return dValue;
             }
+
+            let isPositive: boolean = dValue > 0 ? true : false;
+
+            dValue = Math.abs(dValue);
             let strValue: string = dValue.toString();
             let strInteger: string = "";
             let strFloat: string = "";
@@ -3276,6 +3406,8 @@ import _ = require("lodash");
 
                 dResult = intValue + floatValue;
             }
+
+            dResult = isPositive ? dResult : -dResult;
 
             return dResult;
         }
@@ -3423,11 +3555,6 @@ import _ = require("lodash");
 
         public Scale(scale: number): void {
             this.m_scale = scale;
-        }
-
-        public Translate(dx: number, dy: number): void {
-            this.m_dx = dx;
-            this.m_dy = dy;
         }
 
         public SaveCoeff(): FChartCoeff {
@@ -3689,34 +3816,21 @@ import _ = require("lodash");
         private m_uyb: number;
 
         private GetOffsetX(): number {
-            let offsetX = 0;
+            let offsetX: number = 0;
 
-            let xc1 = this.m_xl + (this.m_xr - this.m_xl) / 2.0;
-            let xc2 = this.m_minx + (this.m_maxx - this.m_minx) / 2.0;
-
-            let diff = xc1 - xc2;
-            if (diff > 0) {
-                offsetX = -this.m_coeff.GetDcWidth(diff);
-            }
-            else {
-                offsetX = this.m_coeff.GetDcWidth(diff);
-            }
+            let xc1: number = this.m_xl + (this.m_xr - this.m_xl) / 2.0;
+            let xc2: number = this.m_minx + (this.m_maxx - this.m_minx) / 2.0;
+            offsetX = xc1 - xc2;
 
             return offsetX;
         }
 
         private GetOffsetY(): number {
-            let offsetY = 0;
+            let offsetY: number = 0;
 
-            let yc1 = this.m_yb + (this.m_yt - this.m_yb) / 2.0;
-            let yc2 = this.m_miny + (this.m_maxy - this.m_miny) / 2.0;
-            let diff = yc1 - yc2;
-            if (diff > 0) {
-                offsetY = -this.m_coeff.GetDcHeight(diff);
-            }
-            else {
-                offsetY = this.m_coeff.GetDcHeight(diff);
-            }
+            let yc1: number = this.m_yb + (this.m_yt - this.m_yb) / 2.0;
+            let yc2: number = this.m_miny + (this.m_maxy - this.m_miny) / 2.0;
+            offsetY = yc1 - yc2;
 
             return offsetY;
         }
@@ -3883,7 +3997,6 @@ import _ = require("lodash");
                         step = step > space ? space : step;
                         this.m_xl -= step;
                         this.m_xr -= step;
-                        this.ZoomRegion(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                     }
                     break;
 
@@ -3894,7 +4007,6 @@ import _ = require("lodash");
                         step = step > space ? space : step;
                         this.m_xl += step;
                         this.m_xr += step;
-                        this.ZoomRegion(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                     }
                     break;
 
@@ -3905,7 +4017,6 @@ import _ = require("lodash");
                         step = step > space ? space : step;
                         this.m_xl -= step;
                         this.m_xr -= step;
-                        this.ZoomRegion(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                     }
                     break;
 
@@ -3916,7 +4027,6 @@ import _ = require("lodash");
                         step = step > space ? space : step;
                         this.m_xl += step;
                         this.m_xr += step;
-                        this.ZoomRegion(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                     }
                     break;
 
@@ -3924,13 +4034,14 @@ import _ = require("lodash");
                     {
                         this.m_xl += scrollValue;
                         this.m_xr += scrollValue;
-                        this.ZoomRegion(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                     }
                     break;
 
                 default:
                     break;
             }
+
+            this.ZoomRegion(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
         }
 
         private OnVerticalScrollBarEvent(eventType: VerticalScrollBarEventTypes, scrollValue: number = 0): void {
@@ -4059,6 +4170,10 @@ import _ = require("lodash");
                     this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair<HorizontalScrollBarEventTypes, any>(HorizontalScrollBarEventTypes.PageLeft, (e) => { this.OnHorizontalScrollBarEvent(e); }));
                     this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair<HorizontalScrollBarEventTypes, any>(HorizontalScrollBarEventTypes.PageRight, (e) => { this.OnHorizontalScrollBarEvent(e); }));
                     this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair<HorizontalScrollBarEventTypes, any>(HorizontalScrollBarEventTypes.Scroll, (a, b) => { this.OnHorizontalScrollBarEvent(a, b); }));
+                    if (!FChartHelper.ObjectIsNullOrEmpty(this.VerticalScrollBar) && this.VerticalScrollBar.Show) {
+                        this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair<VerticalScrollBarEventTypes, any>(VerticalScrollBarEventTypes.Show, (e) => { this.HorizontalScrollBar.OnVerticalScrollBarVisibilityChange(e); }));
+                        this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair<VerticalScrollBarEventTypes, any>(VerticalScrollBarEventTypes.Hide, (e) => { this.HorizontalScrollBar.OnVerticalScrollBarVisibilityChange(e); }));
+                    }
                 }
                 if (!FChartHelper.ObjectIsNullOrEmpty(this.VerticalScrollBar) && this.VerticalScrollBar.Show) {
                     this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair<VerticalScrollBarEventTypes, any>(VerticalScrollBarEventTypes.LineUp, (e) => { this.OnVerticalScrollBarEvent(e); }));
@@ -4066,6 +4181,10 @@ import _ = require("lodash");
                     this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair<VerticalScrollBarEventTypes, any>(VerticalScrollBarEventTypes.PageUp, (e) => { this.OnVerticalScrollBarEvent(e); }));
                     this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair<VerticalScrollBarEventTypes, any>(VerticalScrollBarEventTypes.PageDown, (e) => { this.OnVerticalScrollBarEvent(e); }));
                     this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair<VerticalScrollBarEventTypes, any>(VerticalScrollBarEventTypes.Scroll, (a, b) => { this.OnVerticalScrollBarEvent(a, b); }));
+                    if (!FChartHelper.ObjectIsNullOrEmpty(this.HorizontalScrollBar) && this.HorizontalScrollBar.Show) {
+                        this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair<HorizontalScrollBarEventTypes, any>(HorizontalScrollBarEventTypes.Show, (e) => { this.VerticalScrollBar.OnHorizontalScrollBarVisibilityChange(e); }));
+                        this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair<HorizontalScrollBarEventTypes, any>(HorizontalScrollBarEventTypes.Hide, (e) => { this.VerticalScrollBar.OnHorizontalScrollBarVisibilityChange(e); }));
+                    }
                 }
             }
 
@@ -4361,20 +4480,30 @@ import _ = require("lodash");
                 let info: ScrollBarInfo = new ScrollBarInfo();
                 info.MinValue = 0;
                 info.MaxValue = (this.m_maxx - this.m_minx) - (this.m_xr - this.m_xl);
-                info.ViewportRegion = new Size((this.m_xr - this.m_xl), (this.m_yt - this.m_yb));
+                info.ViewportRegion = new Region(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                 info.ViewportSize = new Size(this.GetPlotWidth(), this.GetPlotHeight());
-                info.WindowRegion = new Size((this.m_maxx - this.m_minx), (this.m_maxy - this.m_miny));
+                info.WindowRegion = new Region(this.m_minx, this.m_maxy, this.m_maxx, this.m_miny);
                 info.Position = (info.MinValue == info.MaxValue) ? 0 : Math.abs(this.m_xl - this.m_minx) / info.MaxValue;
+                if (!FChartHelper.ObjectIsNullOrEmpty(this.VerticalScrollBar) && this.VerticalScrollBar.Show) {
+                    this.VerticalScrollBar.Info.ViewportRegion = info.ViewportRegion;
+                    this.VerticalScrollBar.Info.ViewportSize = info.ViewportSize;
+                    this.VerticalScrollBar.Info.WindowRegion = info.WindowRegion;
+                }
                 this.HorizontalScrollBar.SetScrollBarInfo(info);
             }
             if (!FChartHelper.ObjectIsNullOrEmpty(this.VerticalScrollBar) && this.VerticalScrollBar.Show) {
                 let info: ScrollBarInfo = new ScrollBarInfo();
                 info.MinValue = 0;
                 info.MaxValue = (this.m_maxy - this.m_miny) - (this.m_yt - this.m_yb);
-                info.ViewportRegion = new Size((this.m_xr - this.m_xl), (this.m_yt - this.m_yb));
+                info.ViewportRegion = new Region(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                 info.ViewportSize = new Size(this.GetPlotWidth(), this.GetPlotHeight());
-                info.WindowRegion = new Size((this.m_maxx - this.m_minx), (this.m_maxy - this.m_miny));
+                info.WindowRegion = new Region(this.m_minx, this.m_maxy, this.m_maxx, this.m_miny);
                 info.Position = (info.MinValue == info.MaxValue) ? 0 : Math.abs(this.m_maxy - this.m_yt) / info.MaxValue;
+                if (!FChartHelper.ObjectIsNullOrEmpty(this.HorizontalScrollBar) && this.HorizontalScrollBar.Show) {
+                    this.HorizontalScrollBar.Info.ViewportRegion = info.ViewportRegion;
+                    this.HorizontalScrollBar.Info.ViewportSize = info.ViewportSize;
+                    this.HorizontalScrollBar.Info.WindowRegion = info.WindowRegion;
+                }
                 this.VerticalScrollBar.SetScrollBarInfo(info);
             }
         }
@@ -5366,7 +5495,6 @@ import _ = require("lodash");
                     let y: number = this.m_coeff.ToWcY(0);
                     yaxis.Value2Wc.push({ Key: "top", Value: y });
                 }
-                yaxis.PlotY = reserveBottomSpace;
             }
         }
 
@@ -5472,7 +5600,6 @@ import _ = require("lodash");
 
                 let xaxis: FChartXAxis = this.SearchXAxisByID(serie.XAxisID);
                 let yaxis: FChartYAxis = this.SearchYAxisByID(serie.YAxisID);
-
                 for (let j = 0; j < this.DataSeries[i].Data.length; j++) {
                     let xValue = null;
                     let yValue = null;
@@ -5484,9 +5611,10 @@ import _ = require("lodash");
                         xValue = parseFloat(dp.X);
                     }
                     yValue = dp.Y;
-
-                    let fx = (xValue - xaxis.StartValue) * xaxis.PixelsPerValue;
-                    let fy = this.m_height - (yValue - yaxis.StartValue) * yaxis.PixelsPerValue;
+                    yValue = yValue - yaxis.StartValue + yaxis.YDiff;
+                    let fx: number = (xValue - xaxis.StartValue) * xaxis.PixelsPerValue;
+                    let fy: number = this.m_height - yValue * yaxis.PixelsPerValue;
+                    
                     dp.fx = this.m_coeff.ToWcX(fx);
                     dp.fy = this.m_coeff.ToWcY(fy);
                 }
@@ -5640,6 +5768,32 @@ import _ = require("lodash");
             if (this.m_scale != 0.0) {
                 this.m_xr = this.m_xl + this.m_scale * this.m_width;
                 this.m_yb = this.m_yt - this.m_scale * this.m_height;
+
+                if (this.m_xl < this.m_uxl) {
+                    this.m_minx = this.m_xl;
+                }
+                else {
+                    this.m_minx = this.m_uxl;
+                }
+                if (this.m_xr > this.m_uxr) {
+                    this.m_maxx = this.m_xr;
+                }
+                else {
+                    this.m_maxx = this.m_uxr;
+                }
+
+                if (this.m_yb < this.m_uyb) {
+                    this.m_miny = this.m_yb;
+                }
+                else {
+                    this.m_miny = this.m_uyb;
+                }
+                if (this.m_yt > this.m_uyt) {
+                    this.m_maxy = this.m_yt;
+                }
+                else {
+                    this.m_maxy = this.m_uyt;
+                }
             }
             else {
                 let xx1 = (this.m_maxy - this.m_miny) * this.m_width * 0.5 / this.m_height;
@@ -5666,6 +5820,7 @@ import _ = require("lodash");
                 this.m_uyb = this.m_yb;
                 this.m_uyt = this.m_yt;
             }
+
             this.CalcCoefficient();
         }
 

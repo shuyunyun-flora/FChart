@@ -86,6 +86,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         FChartEventTypes[FChartEventTypes["RangeChanged"] = 1] = "RangeChanged";
     })(exports.FChartEventTypes || (exports.FChartEventTypes = {}));
     var FChartEventTypes = exports.FChartEventTypes;
+    var N_VALID_DECIMAL = 6;
     var ChartGraphObject = (function () {
         function ChartGraphObject() {
             this.AttachedChart = null;
@@ -446,19 +447,8 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.TickWidth = 0;
             this.MarginBetweenTickAndLabel = 0;
             this.MaxTickLabelWidth = 0;
-            this.m_dPlotY = 0;
             this.Type = ChartAxisType.YAxis;
         }
-        Object.defineProperty(FChartYAxis.prototype, "PlotY", {
-            get: function () {
-                return this.m_dPlotY * (this.Zoomable ? this.AttachedChart.ZoomLevel : 1);
-            },
-            set: function (value) {
-                this.m_dPlotY = value;
-            },
-            enumerable: true,
-            configurable: true
-        });
         Object.defineProperty(FChartYAxis.prototype, "Zoomable", {
             get: function () {
                 if (!FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
@@ -591,6 +581,34 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             FChartHelper.SetSVGTextAttributes(text, "yaxis-title-" + this.ID, x.toString(), y.toString(), this.Title.Label, "middle", this.Title.FontFamily, this.Title.FontStyle, this.Title.FontSize.toString(), this.Title.FontWeight, this.FontColor, transform);
             svg.appendChild(text);
         };
+        Object.defineProperty(FChartYAxis.prototype, "YDiff", {
+            get: function () {
+                var yDiff = 0;
+                var iMultiple = 1;
+                if (this.BottomEnvelopeLine.Show) {
+                    switch (this.BottomEnvelopeLine.Gradient) {
+                        case EnvelopeLineGradient.One:
+                            iMultiple = 1;
+                            break;
+                        case EnvelopeLineGradient.OneHalf:
+                            iMultiple = 2;
+                            break;
+                        case EnvelopeLineGradient.OneFourth:
+                            iMultiple = 4;
+                            break;
+                        default:
+                            break;
+                    }
+                    if (this.TopEnvelopeLine.Show) {
+                        iMultiple *= 2;
+                    }
+                    yDiff = this.Tick.Scale / iMultiple;
+                }
+                return yDiff;
+            },
+            enumerable: true,
+            configurable: true
+        });
         return FChartYAxis;
     }(FChartAxis));
     exports.FChartYAxis = FChartYAxis;
@@ -617,6 +635,37 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.Height = h;
         }
         return Size;
+    }());
+    var Region = (function () {
+        function Region(x1, y1, x2, y2) {
+            this.X1 = 0;
+            this.Y1 = 0;
+            this.X2 = 0;
+            this.Y2 = 0;
+            this.X1 = x1;
+            this.Y1 = y1;
+            this.X2 = x2;
+            this.Y2 = y2;
+        }
+        Object.defineProperty(Region.prototype, "Width", {
+            get: function () {
+                var w = Math.abs(this.X2 - this.X1);
+                w = FChartHelper.RoundFloatNumber(w, N_VALID_DECIMAL);
+                return w;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Region.prototype, "Height", {
+            get: function () {
+                var h = Math.abs(this.Y1 - this.Y2);
+                h = FChartHelper.RoundFloatNumber(h, N_VALID_DECIMAL);
+                return h;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        return Region;
     }());
     var FChartDataSerie = (function (_super) {
         __extends(FChartDataSerie, _super);
@@ -653,7 +702,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 var iy = chart.m_coeff.ToDvcY(y);
                 var pt = svgPlot.createSVGPoint();
                 pt.x = chart.XAxisLeftMargin + ix;
-                pt.y = iy - yaxis.PlotY;
+                pt.y = iy;
                 serieLine.points.appendItem(pt);
             }
             serieLine.setAttribute("stroke-width", this.LineWidth.toString());
@@ -670,7 +719,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     // Draw mark.
                     this.Mark.Key = this.XAxisID + "-" + this.YAxisID + "-" + this.ZOrder.toString() + "-Mark-" + i.toString();
                     this.Mark.X = ix;
-                    this.Mark.Y = iy - yaxis.PlotY;
+                    this.Mark.Y = iy;
                     this.Mark.Draw(chart);
                 }
             }
@@ -1173,6 +1222,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.DefaultShortSize = 30;
             this.DefaultLongSize = 300;
             this.MaxBarSize = 16;
+            this.ThumbnailSize = new Size(0, 0);
             this.ShortSize = 0;
             this.LongSize = 0;
             this.ZoomInHolder = null;
@@ -1189,12 +1239,11 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.DraggerHolderID = "";
             this.LabelHolderID = "";
             this.ProgressBarHolderID = "";
-            this.DraggerScale = 0;
-            this.DraggerBigScale = 0;
             this.CircleRadius = 0;
             this.DraggerX = 0;
             this.DraggerY = 0;
-            this.Length = 0;
+            this.L = 0;
+            this.D = 0;
             this.Step = 10;
             this.ClickingOnDragger = false;
             this.DraggingStartPosition = 0;
@@ -1276,15 +1325,25 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 this.LongSize = availableSpace;
             }
         };
-        FChartZoomControl.prototype.Draw = function (chart) {
-            var _this = this;
-            this.AttachedChart = chart;
-            this.IdentifyID();
-            var svgZoomControl = chart.GetSVGSVGElementByID(this.ID);
-            if (FChartHelper.ObjectIsNullOrEmpty(svgZoomControl)) {
-                return;
+        FChartZoomControl.prototype.CalculateCircleRadiusAndThumbnailSize = function () {
+            if (this.Orientation == Orientation.Horizontal) {
+                var w = this.LongSize;
+                var h = this.ShortSize;
+                w -= this.Margin;
+                h -= this.Margin;
+                var mx = this.Margin / 2;
+                var my = this.Margin / 2;
+                var twothOfH = h / 2;
+                var eighthOfW = w / 8;
+                var r = Math.min(eighthOfW / 2, twothOfH / 2);
+                this.CircleRadius = r;
+                this.D = h / 2 + (h / 2 - r * 2);
+                var wb = w - 4 * r;
+                var tw = Math.min(wb / 10, this.MaxBarSize);
+                this.ThumbnailSize = new Size(tw, r * 2);
+                this.L = wb - tw;
             }
-            if (this.Layout == ZoomControlLayout.Left || this.Layout == ZoomControlLayout.Right) {
+            else {
                 var w = this.ShortSize;
                 var h = this.LongSize;
                 w -= this.Margin;
@@ -1295,10 +1354,87 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 var eighthOfH = h / 8;
                 var r = Math.min(eighthOfH / 2, twothOfW / 2);
                 this.CircleRadius = r;
+                this.D = w / 2 + (w / 2 - r * 2);
                 var hb = h - 4 * r;
-                this.Length = hb;
+                var th = Math.min(hb / 10, this.MaxBarSize);
+                this.ThumbnailSize = new Size(r * 2, th);
+                this.L = hb - th;
+            }
+        };
+        FChartZoomControl.prototype.Draw = function (chart) {
+            var _this = this;
+            this.AttachedChart = chart;
+            this.IdentifyID();
+            var svgZoomControl = chart.GetSVGSVGElementByID(this.ID);
+            if (FChartHelper.ObjectIsNullOrEmpty(svgZoomControl)) {
+                return;
+            }
+            this.CalculateCircleRadiusAndThumbnailSize();
+            var mx = this.Margin / 2;
+            var my = this.Margin / 2;
+            var r = this.CircleRadius;
+            var d = 0;
+            if (this.Orientation == Orientation.Horizontal) {
+                d = this.ThumbnailSize.Height;
+                var cx1 = mx + 2 * r + this.L + this.ThumbnailSize.Width + r;
+                var cy1 = my + this.D + r;
+                var circle1 = chart.CreateSVGCircleElement();
+                FChartHelper.SetSVGCircleAttributes(circle1, this.ZoomInHolderID, cx1.toString(), cy1.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
+                var ix1 = mx + 2 * r + this.L + this.ThumbnailSize.Width;
+                var iy1 = my + this.D + r;
+                var ix2 = ix1 + 2 * r;
+                var iy2 = iy1;
+                var lineP1 = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP1, this.ZoomInHolderL1ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP1);
+                ix1 = ix1 + r;
+                ix2 = ix1;
+                iy1 = my + this.D;
+                iy2 = iy1 + 2 * r;
+                var lineP2 = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP2, this.ZoomInHolderL2ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP2);
+                svgZoomControl.appendChild(circle1);
+                this.ZoomInHolder = circle1;
+                var cx2 = mx + r;
+                var cy2 = my + this.D + r;
+                var circle2 = chart.CreateSVGCircleElement();
+                FChartHelper.SetSVGCircleAttributes(circle2, this.ZoomOutHolderID, cx2.toString(), cy2.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
+                ix1 = mx + r;
+                ix2 = ix1;
+                iy1 = my + this.D;
+                iy2 = iy1 + 2 * r;
+                var lineP3 = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(lineP3, this.ZoomOutHolderL1ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(lineP3);
+                svgZoomControl.appendChild(circle2);
+                this.ZoomOutHolder = circle2;
+                var lx1 = mx + 2 * r;
+                var ly1 = my + this.D + r;
+                var lx2 = lx1 + this.L + this.ThumbnailSize.Width;
+                var ly2 = ly1;
+                var progressBar = chart.CreateSVGLineElement();
+                FChartHelper.SetSVGLineAttributes(progressBar, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
+                svgZoomControl.appendChild(progressBar);
+                this.ProgressBarHolder = progressBar;
+                var dragger = chart.CreateSVGPathElement();
+                FChartHelper.SetSVGPathAttributes(dragger, this.DraggerHolderID, "", this.LineWidth.toString(), this.LineColor, this.LineColor);
+                svgZoomControl.appendChild(dragger);
+                this.DraggerHolder = dragger;
+                this.UpdateDraggerData();
+                var tx = mx + 2 * r + (this.L + this.ThumbnailSize.Width) / 2;
+                var ty = my + this.D / 2;
+                var dLabelFontSize = this.FontSize;
+                ty += (dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2);
+                var strLabel = chart.ZoomLevel.toFixed(2);
+                var text = chart.CreateSVGTextElement();
+                FChartHelper.SetSVGTextAttributes(text, this.LabelHolderID, tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor);
+                svgZoomControl.appendChild(text);
+                this.LabelHolder = text;
+            }
+            else {
                 var cx1 = mx + r;
-                var cy1 = my + 2 * r - r;
+                var cy1 = my + r;
                 var circle1 = chart.CreateSVGCircleElement();
                 FChartHelper.SetSVGCircleAttributes(circle1, this.ZoomInHolderID, cx1.toString(), cy1.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
                 var ix1 = cx1;
@@ -1318,10 +1454,10 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 svgZoomControl.appendChild(circle1);
                 this.ZoomInHolder = circle1;
                 var cx2 = mx + r;
-                var cy2 = my + 2 * r + hb + r;
+                var cy2 = my + 2 * r + this.L + this.ThumbnailSize.Height + r;
                 var circle2 = chart.CreateSVGCircleElement();
                 FChartHelper.SetSVGCircleAttributes(circle2, this.ZoomOutHolderID, cx2.toString(), cy2.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
-                iy1 = my + 2 * r + hb + r;
+                iy1 = my + 2 * r + this.L + this.ThumbnailSize.Height + r;
                 iy2 = iy1;
                 var lineP3 = chart.CreateSVGLineElement();
                 FChartHelper.SetSVGLineAttributes(lineP3, this.ZoomOutHolderL1ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
@@ -1331,99 +1467,24 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 var lx1 = cx1;
                 var ly1 = my + 2 * r;
                 var lx2 = cx1;
-                var ly2 = my + 2 * r + hb;
+                var ly2 = my + 2 * r + this.L + this.ThumbnailSize.Height;
                 var progressBar = chart.CreateSVGLineElement();
                 FChartHelper.SetSVGLineAttributes(progressBar, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
                 svgZoomControl.appendChild(progressBar);
                 this.ProgressBarHolder = progressBar;
                 var dragger = chart.CreateSVGPathElement();
-                dragger.setAttribute("id", this.DraggerHolderID);
-                dragger.setAttribute("stroke-width", this.LineWidth.toString());
-                dragger.setAttribute("stroke", this.LineColor);
-                dragger.setAttribute("fill", this.LineColor);
+                FChartHelper.SetSVGPathAttributes(dragger, this.DraggerHolderID, "", this.LineWidth.toString(), this.LineColor, this.LineColor);
                 svgZoomControl.appendChild(dragger);
                 this.DraggerHolder = dragger;
                 this.UpdateDraggerData();
-                var tx = mx + r * 2 + twothOfW;
-                var ty = my + 2 * r + hb / 2;
+                var tx = mx + r * 2 + this.D;
+                var ty = my + 2 * r + (this.L + this.ThumbnailSize.Height) / 2;
                 var dLabelFontSize = this.FontSize;
                 ty += (dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2);
                 var strLabel = chart.ZoomLevel.toFixed(2);
                 var text = chart.CreateSVGTextElement();
                 var transform = "rotate(270," + tx.toString() + "," + ty.toString() + ")";
                 FChartHelper.SetSVGTextAttributes(text, this.LabelHolderID, tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor, transform);
-                svgZoomControl.appendChild(text);
-                this.LabelHolder = text;
-            }
-            else {
-                var w = this.LongSize;
-                var h = this.ShortSize;
-                w -= this.Margin;
-                h -= this.Margin;
-                var mx = this.Margin / 2;
-                var my = this.Margin / 2;
-                var twothOfH = h / 2;
-                var eighthOfW = w / 8;
-                var r = Math.min(eighthOfW / 2, twothOfH / 2);
-                this.CircleRadius = r;
-                var wb = w - 4 * r;
-                this.Length = wb;
-                var cx1 = mx + r;
-                var cy1 = my + twothOfH + r;
-                var circle1 = chart.CreateSVGCircleElement();
-                FChartHelper.SetSVGCircleAttributes(circle1, this.ZoomInHolderID, cx1.toString(), cy1.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
-                var ix1 = mx;
-                var iy1 = my + twothOfH + r;
-                var ix2 = mx + 2 * r;
-                var iy2 = iy1;
-                var lineP1 = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(lineP1, this.ZoomInHolderL1ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(lineP1);
-                ix1 = mx + r;
-                ix2 = ix1;
-                iy1 = my + twothOfH;
-                iy2 = iy1 + 2 * r;
-                var lineP2 = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(lineP2, this.ZoomInHolderL2ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(lineP2);
-                svgZoomControl.appendChild(circle1);
-                this.ZoomInHolder = circle1;
-                var cx2 = mx + 2 * r + wb + r;
-                var cy2 = my + twothOfH + r;
-                var circle2 = chart.CreateSVGCircleElement();
-                FChartHelper.SetSVGCircleAttributes(circle2, this.ZoomOutHolderID, cx2.toString(), cy2.toString(), r.toString(), "transparent", this.LineWidth.toString(), this.LineColor);
-                ix1 = mx + 2 * r + wb + r;
-                ix2 = ix1;
-                iy1 = my + twothOfH;
-                iy2 = iy1 + 2 * r;
-                var lineP3 = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(lineP3, this.ZoomOutHolderL1ID, ix1.toString(), iy1.toString(), ix2.toString(), iy2.toString(), this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(lineP3);
-                svgZoomControl.appendChild(circle2);
-                this.ZoomOutHolder = circle2;
-                var lx1 = mx + 2 * r;
-                var ly1 = my + twothOfH + r;
-                var lx2 = lx1 + wb;
-                var ly2 = ly1;
-                var progressBar = chart.CreateSVGLineElement();
-                FChartHelper.SetSVGLineAttributes(progressBar, this.ProgressBarHolderID, lx1.toString(), ly1.toString(), lx2.toString(), ly2.toString(), this.LineWidth.toString(), this.LineColor);
-                svgZoomControl.appendChild(progressBar);
-                this.ProgressBarHolder = progressBar;
-                var dragger = chart.CreateSVGPathElement();
-                dragger.setAttribute("id", this.DraggerHolderID);
-                dragger.setAttribute("stroke-width", this.LineWidth.toString());
-                dragger.setAttribute("stroke", this.LineColor);
-                dragger.setAttribute("fill", this.LineColor);
-                svgZoomControl.appendChild(dragger);
-                this.DraggerHolder = dragger;
-                this.UpdateDraggerData();
-                var tx = mx + 2 * r + wb / 2;
-                var ty = my + twothOfH / 2;
-                var dLabelFontSize = this.FontSize;
-                ty += (dLabelFontSize / 2 - dLabelFontSize * 0.3 / 2);
-                var strLabel = chart.ZoomLevel.toFixed(2);
-                var text = chart.CreateSVGTextElement();
-                FChartHelper.SetSVGTextAttributes(text, this.LabelHolderID, tx.toString(), ty.toString(), strLabel, "middle", this.FontFamily, this.FontStyle, dLabelFontSize.toString(), this.FontWeight, this.FontColor);
                 svgZoomControl.appendChild(text);
                 this.LabelHolder = text;
             }
@@ -1444,21 +1505,12 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.LabelHolder.textContent = strValue;
         };
         FChartZoomControl.prototype.Zoom = function (delta) {
+            if (delta == 0) {
+                return false;
+            }
             if (this.Orientation == Orientation.Horizontal) {
-                var left = 0;
-                var right = 0;
-                var len = this.AttachedChart.MaxZoomLevel * this.DraggerBigScale;
-                var strX = this.DraggerHolder.getAttribute("x");
-                var x = parseFloat(strX);
-                var mx = this.Margin / 2;
-                var x1 = mx + 2 * this.CircleRadius;
-                var x2 = x1 + len + 2 * this.CircleRadius;
-                var offsetX = mx + this.CircleRadius * 2;
-                left = this.DraggerX - offsetX - this.DraggerScale;
-                right = offsetX + len - this.DraggerX - this.DraggerScale;
-                if (delta == 0) {
-                    return false;
-                }
+                var left = this.DraggerX - this.Margin / 2 - this.CircleRadius * 2;
+                var right = this.L - left;
                 if (delta < 0) {
                     if (left == 0) {
                         return false;
@@ -1476,16 +1528,8 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 }
             }
             else {
-                var bottom = 0;
-                var top_1 = 0;
-                var len = this.AttachedChart.MaxZoomLevel * this.DraggerBigScale;
-                var my = this.Margin / 2;
-                var offsetY = my + this.CircleRadius * 2;
-                bottom = offsetY + len - this.DraggerY - this.DraggerScale;
-                top_1 = this.DraggerY - offsetY - this.DraggerScale;
-                if (delta == 0) {
-                    return false;
-                }
+                var top_1 = (this.DraggerY - this.Margin / 2 - this.CircleRadius * 2);
+                var bottom = this.L - top_1;
                 if (delta > 0) {
                     if (bottom == 0) {
                         return false;
@@ -1509,49 +1553,35 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
                 return;
             }
-            this.Zoom(-this.Step);
+            var step = this.Orientation == Orientation.Horizontal ? this.Step : -this.Step;
+            this.Zoom(step);
         };
         FChartZoomControl.prototype.OnZoomOut = function (e) {
             if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
                 return;
             }
-            this.Zoom(this.Step);
+            var step = this.Orientation == Orientation.Horizontal ? -this.Step : this.Step;
+            this.Zoom(step);
         };
         FChartZoomControl.prototype.UpdateDraggerData = function () {
-            var length = 0;
-            if (this.Orientation == Orientation.Horizontal) {
-                length = this.ProgressBarHolder.x2.baseVal.value - this.ProgressBarHolder.x1.baseVal.value;
-            }
-            else {
-                length = this.ProgressBarHolder.y2.baseVal.value - this.ProgressBarHolder.y1.baseVal.value;
-            }
-            var scale = length / this.AttachedChart.MaxZoomLevel;
-            var exponent = 0;
-            while (scale > this.MaxBarSize / 2) {
-                scale /= 2;
-                exponent++;
-            }
-            var bigScale = scale * Math.pow(2, exponent);
-            this.DraggerScale = scale;
-            this.DraggerBigScale = bigScale;
-            var delta = bigScale == scale ? 0 : scale;
+            var maxZoomLevel = this.AttachedChart.MaxZoomLevel - 1;
+            var scale = this.L / maxZoomLevel;
             var mx = this.Margin / 2;
             var my = this.Margin / 2;
             var r = this.CircleRadius;
             if (this.Orientation == Orientation.Horizontal) {
-                var twothOfH = this.ShortSize / 2;
-                var bx = mx + 2 * r + this.AttachedChart.ZoomLevel * bigScale - delta;
-                var by = my + twothOfH + r;
+                var bx = mx + 2 * r + (this.AttachedChart.ZoomLevel - 1) * scale;
+                var by = my + this.D;
                 this.DraggerX = bx;
                 this.DraggerY = by;
-                var bx1 = bx - scale;
-                var by1 = by - r;
-                var bx2 = bx + scale;
-                var by2 = by - r;
-                var bx3 = bx + scale;
-                var by3 = by + r;
-                var bx4 = bx - scale;
-                var by4 = by + r;
+                var bx1 = bx;
+                var by1 = by;
+                var bx2 = bx + this.ThumbnailSize.Width;
+                var by2 = by;
+                var bx3 = bx + this.ThumbnailSize.Width;
+                var by3 = by + this.ThumbnailSize.Height;
+                var bx4 = bx;
+                var by4 = by + this.ThumbnailSize.Height;
                 var d = "M" + bx1.toString() + " " + by1.toString() + " " +
                     "L" + bx2.toString() + " " + by2.toString() + " " +
                     "L" + bx3.toString() + " " + by3.toString() + " " +
@@ -1559,18 +1589,18 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 this.DraggerHolder.setAttribute("d", d);
             }
             else {
-                var bx = mx + r;
-                var by = my + 2 * r + (length - (this.AttachedChart.ZoomLevel * bigScale - delta));
+                var bx = mx;
+                var by = my + 2 * r + (this.L - (this.AttachedChart.ZoomLevel - 1) * scale);
                 this.DraggerX = bx;
                 this.DraggerY = by;
-                var bx1 = bx - r;
-                var by1 = by - scale;
-                var bx2 = bx + r;
-                var by2 = by - scale;
-                var bx3 = bx + r;
-                var by3 = by + scale;
-                var bx4 = bx - r;
-                var by4 = by + scale;
+                var bx1 = bx;
+                var by1 = by;
+                var bx2 = bx + this.ThumbnailSize.Width;
+                var by2 = by;
+                var bx3 = bx + this.ThumbnailSize.Width;
+                var by3 = by + this.ThumbnailSize.Height;
+                var bx4 = bx;
+                var by4 = by + this.ThumbnailSize.Height;
                 var d = "M" + bx1.toString() + " " + by1.toString() + " " +
                     "L" + bx2.toString() + " " + by2.toString() + " " +
                     "L" + bx3.toString() + " " + by3.toString() + " " +
@@ -1589,15 +1619,17 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         Object.defineProperty(FChartZoomControl.prototype, "ZoomValue", {
             get: function () {
                 var zoomValue = 0;
-                var length = 0;
+                var maxZoomLevel = this.AttachedChart.MaxZoomLevel - 1;
                 if (this.Orientation == Orientation.Horizontal) {
-                    length = this.ProgressBarHolder.x2.baseVal.value - this.ProgressBarHolder.x1.baseVal.value;
-                    zoomValue = (this.DraggerX - this.ProgressBarHolder.x1.baseVal.value - this.DraggerScale) / length * this.AttachedChart.MaxZoomLevel;
+                    var space = this.DraggerX - this.Margin / 2 - this.CircleRadius * 2;
+                    zoomValue = space / this.L * maxZoomLevel;
                 }
                 else {
-                    length = this.ProgressBarHolder.y2.baseVal.value - this.ProgressBarHolder.y1.baseVal.value;
-                    zoomValue = (length - (this.DraggerY - this.ProgressBarHolder.y1.baseVal.value - this.DraggerScale)) / length * this.AttachedChart.MaxZoomLevel;
+                    var space = this.DraggerY - this.Margin / 2 - this.CircleRadius * 2;
+                    space = this.L - space;
+                    zoomValue = space / this.L * maxZoomLevel;
                 }
+                zoomValue += 1;
                 return zoomValue;
             },
             enumerable: true,
@@ -1665,10 +1697,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             else {
                 delta = e.clientY - this.DraggingStartPosition;
             }
-            var changeStart = this.Zoom(delta);
-            if (!changeStart) {
-                return;
-            }
+            this.Zoom(delta);
             if (this.Orientation == Orientation.Horizontal) {
                 this.DraggingStartPosition = e.clientX;
             }
@@ -1686,6 +1715,8 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         HorizontalScrollBarEventTypes[HorizontalScrollBarEventTypes["PageLeft"] = 2] = "PageLeft";
         HorizontalScrollBarEventTypes[HorizontalScrollBarEventTypes["PageRight"] = 3] = "PageRight";
         HorizontalScrollBarEventTypes[HorizontalScrollBarEventTypes["Scroll"] = 4] = "Scroll";
+        HorizontalScrollBarEventTypes[HorizontalScrollBarEventTypes["Show"] = 5] = "Show";
+        HorizontalScrollBarEventTypes[HorizontalScrollBarEventTypes["Hide"] = 6] = "Hide";
     })(HorizontalScrollBarEventTypes || (HorizontalScrollBarEventTypes = {}));
     var VerticalScrollBarEventTypes;
     (function (VerticalScrollBarEventTypes) {
@@ -1694,16 +1725,48 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         VerticalScrollBarEventTypes[VerticalScrollBarEventTypes["PageUp"] = 2] = "PageUp";
         VerticalScrollBarEventTypes[VerticalScrollBarEventTypes["PageDown"] = 3] = "PageDown";
         VerticalScrollBarEventTypes[VerticalScrollBarEventTypes["Scroll"] = 4] = "Scroll";
+        VerticalScrollBarEventTypes[VerticalScrollBarEventTypes["Show"] = 5] = "Show";
+        VerticalScrollBarEventTypes[VerticalScrollBarEventTypes["Hide"] = 6] = "Hide";
     })(VerticalScrollBarEventTypes || (VerticalScrollBarEventTypes = {}));
     var ScrollBarInfo = (function () {
         function ScrollBarInfo() {
             this.MinValue = 0;
             this.MaxValue = 0;
-            this.ViewportRegion = new Size(0, 0);
-            this.ViewportSize = new Size(0, 0);
-            this.WindowRegion = new Size(0, 0);
             this.Position = 0;
+            this.m_ViewportRegion = new Region(0, 0, 0, 0);
+            this.m_ViewportSize = new Size(0, 0);
+            this.m_WindowRegion = new Region(0, 0, 0, 0);
         }
+        Object.defineProperty(ScrollBarInfo.prototype, "ViewportRegion", {
+            get: function () {
+                return this.m_ViewportRegion;
+            },
+            set: function (region) {
+                this.m_ViewportRegion = region;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(ScrollBarInfo.prototype, "ViewportSize", {
+            get: function () {
+                return this.m_ViewportSize;
+            },
+            set: function (size) {
+                this.m_ViewportSize = size;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(ScrollBarInfo.prototype, "WindowRegion", {
+            get: function () {
+                return this.m_WindowRegion;
+            },
+            set: function (region) {
+                this.m_WindowRegion = region;
+            },
+            enumerable: true,
+            configurable: true
+        });
         return ScrollBarInfo;
     }());
     var ScrollBar = (function (_super) {
@@ -1716,12 +1779,20 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.TweakSize = new Size(0, 0);
             this.ThumbnailSize = new Size(0, 0);
             this.ThumbnailColor = "black";
-            this.Info = new ScrollBarInfo();
+            this.m_info = new ScrollBarInfo();
             this.Initialized = false;
+            this.m_bVisible = false;
             this.Opacity = 0.5;
             this.BackgroundColor = "DarkGray";
             this.ThumbnailColor = "Black";
         }
+        Object.defineProperty(ScrollBar.prototype, "Info", {
+            get: function () {
+                return this.m_info;
+            },
+            enumerable: true,
+            configurable: true
+        });
         ScrollBar.prototype.SetScrollBarInfo = function (info) {
         };
         ScrollBar.prototype.GetScrollBarInfo = function () {
@@ -1779,6 +1850,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.PageLeftID = "HorizontalScrollBar-PageLeft";
             this.PageRightID = "HorizontalScrollBar-PageRight";
             this.EventListenerMap = new Array();
+            this.SuppressVisibilityChange = false;
             this.ClickingOnThumbnail = false;
             this.DraggingStartPosition = 0;
             this.Dragging = false;
@@ -1792,16 +1864,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 return;
             }
             this.AttachedChart = chart;
-            if (!FChartHelper.ObjectIsNullOrEmpty(this.Presentation)) {
-                this.Presentation.innerHTML = "";
-            }
-            this.LeftPart = null;
-            this.RightPart = null;
-            this.LeftPartTriangle = null;
-            this.RightPartTriangle = null;
-            this.PageLeft = null;
-            this.PageRight = null;
-            this.Thumbnail = null;
+            this.Clear();
             var w = this.AttachedChart.GetPlotWidth();
             var h = this.AttachedChart.GetPlotHeight();
             this.Width = w - this.VerticalScrollBarWidth;
@@ -1818,7 +1881,9 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.DrawLeftPart();
             this.DrawRightPart();
             this.DrawThumbnailAndPageLeftPageRight();
-            this.Visible ? this.ShowControl() : this.HideControl();
+            if (!this.Visible) {
+                this.Visible ? this.ShowControl() : this.HideControl();
+            }
         };
         HorizontalScrollBar.prototype.IdentifyID = function () {
             if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
@@ -1836,6 +1901,19 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.PageLeftID = this.AttachedChart.IdentifyID(this.PageLeftID);
             this.PageRightID = this.AttachedChart.IdentifyID(this.PageRightID);
             this.IDIdentified = true;
+        };
+        HorizontalScrollBar.prototype.Clear = function () {
+            if (!FChartHelper.ObjectIsNullOrEmpty(this.Presentation)) {
+                this.Presentation.innerHTML = "";
+            }
+            this.LeftPart = null;
+            this.RightPart = null;
+            this.LeftPartTriangle = null;
+            this.RightPartTriangle = null;
+            this.PageLeft = null;
+            this.PageRight = null;
+            this.Thumbnail = null;
+            this.AttachedChart.RemoveSVGFromContainer(this.Presentation);
         };
         HorizontalScrollBar.prototype.DrawLeftPart = function () {
             var w = this.TweakSize.Width;
@@ -1946,7 +2024,9 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             if (this.Initialized && this.Visible) {
                 this.DrawThumbnailAndPageLeftPageRight();
             }
-            this.Visible ? this.ShowControl() : this.HideControl();
+            if (this.Visible != this.m_bVisible) {
+                this.Visible ? this.ShowControl() : this.HideControl();
+            }
         };
         Object.defineProperty(HorizontalScrollBar.prototype, "IsVerticalScrollBarVisible", {
             get: function () {
@@ -1960,7 +2040,8 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         });
         Object.defineProperty(HorizontalScrollBar.prototype, "VerticalScrollBarWidth", {
             get: function () {
-                if (this.IsVerticalScrollBarVisible) {
+                if (!this.IsVerticalScrollBarVisible) {
+                    return 0;
                 }
                 var w = Math.min(this.AttachedChart.GetPlotWidth() * 0.1, this.MaxHeight);
                 return w;
@@ -1990,6 +2071,10 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.PageLeft.setAttribute("opacity", this.Opacity.toString());
             this.PageRight.setAttribute("opacity", this.Opacity.toString());
             this.Thumbnail.setAttribute("opacity", this.Opacity.toString());
+            this.m_bVisible = true;
+            if (!this.SuppressVisibilityChange) {
+                this.FireEvent(HorizontalScrollBarEventTypes.Show);
+            }
             _super.prototype.ShowControl.call(this);
         };
         HorizontalScrollBar.prototype.HideControl = function () {
@@ -2003,6 +2088,10 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.PageLeft.setAttribute("opacity", "0");
             this.PageRight.setAttribute("opacity", "0");
             this.Thumbnail.setAttribute("opacity", "0");
+            this.m_bVisible = false;
+            if (!this.SuppressVisibilityChange) {
+                this.FireEvent(HorizontalScrollBarEventTypes.Hide);
+            }
             _super.prototype.HideControl.call(this);
         };
         Object.defineProperty(HorizontalScrollBar.prototype, "Visible", {
@@ -2012,6 +2101,13 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             enumerable: true,
             configurable: true
         });
+        HorizontalScrollBar.prototype.OnVerticalScrollBarVisibilityChange = function (bVisible) {
+            this.SuppressVisibilityChange = true;
+            if (this.Initialized && this.Visible) {
+                this.Draw(this.AttachedChart);
+            }
+            this.SuppressVisibilityChange = false;
+        };
         HorizontalScrollBar.prototype.OnMouseDown = function (e) {
             if (FChartHelper.ObjectIsNullOrEmpty(e) || FChartHelper.ObjectIsNullOrEmpty(e.toElement)) {
                 return;
@@ -2104,6 +2200,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.PageUpID = "VerticalScrollBar-PageUp";
             this.PageDownID = "VerticalScrollBar-PageDown";
             this.EventListenerMap = new Array();
+            this.SuppressVisibilityChange = false;
             this.ClickingOnThumbnail = false;
             this.DraggingStartPosition = 0;
             this.Dragging = false;
@@ -2114,16 +2211,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 return;
             }
             this.AttachedChart = chart;
-            if (!FChartHelper.ObjectIsNullOrEmpty(this.Presentation)) {
-                this.Presentation.innerHTML = "";
-            }
-            this.UpPart = null;
-            this.DownPart = null;
-            this.UpPartTriangle = null;
-            this.DownPartTriangle = null;
-            this.PageUp = null;
-            this.PageDown = null;
-            this.Thumbnail = null;
+            this.Clear();
             var w = this.AttachedChart.GetPlotWidth();
             var h = this.AttachedChart.GetPlotHeight();
             this.Width = Math.min(w * 0.1, this.MaxWidth);
@@ -2140,7 +2228,9 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.DrawUpPart();
             this.DrawDownPart();
             this.DrawThumbnailAndPageUpPageDown();
-            this.Visible ? this.ShowControl() : this.HideControl();
+            if (!this.Visible) {
+                this.Visible ? this.ShowControl() : this.HideControl();
+            }
         };
         VerticalScrollBar.prototype.IdentifyID = function () {
             if (FChartHelper.ObjectIsNullOrEmpty(this.AttachedChart)) {
@@ -2158,6 +2248,19 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.PageUpID = this.AttachedChart.IdentifyID(this.PageUpID);
             this.PageDownID = this.AttachedChart.IdentifyID(this.PageDownID);
             this.IDIdentified = true;
+        };
+        VerticalScrollBar.prototype.Clear = function () {
+            if (!FChartHelper.ObjectIsNullOrEmpty(this.Presentation)) {
+                this.Presentation.innerHTML = "";
+            }
+            this.UpPart = null;
+            this.DownPart = null;
+            this.UpPartTriangle = null;
+            this.DownPartTriangle = null;
+            this.PageUp = null;
+            this.PageDown = null;
+            this.Thumbnail = null;
+            this.AttachedChart.RemoveSVGFromContainer(this.Presentation);
         };
         VerticalScrollBar.prototype.DrawUpPart = function () {
             var w = this.TweakSize.Width;
@@ -2187,7 +2290,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         VerticalScrollBar.prototype.DrawDownPart = function () {
             var w = this.TweakSize.Width;
             var h = this.TweakSize.Height;
-            var startY = this.TweakSize.Width / 2 + this.L;
+            var startY = this.TweakSize.Height / 2 + this.L;
             var x1 = 0;
             var y1 = startY;
             var x2 = w;
@@ -2268,7 +2371,9 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             if (this.Initialized && this.Visible) {
                 this.DrawThumbnailAndPageUpPageDown();
             }
-            this.Visible ? this.ShowControl() : this.HideControl();
+            if (this.Visible != this.m_bVisible) {
+                this.Visible ? this.ShowControl() : this.HideControl();
+            }
         };
         Object.defineProperty(VerticalScrollBar.prototype, "IsHorizontalScrollBarVisible", {
             get: function () {
@@ -2282,7 +2387,8 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         });
         Object.defineProperty(VerticalScrollBar.prototype, "HorizontalScrollBarHeight", {
             get: function () {
-                if (this.IsHorizontalScrollBarVisible) {
+                if (!this.IsHorizontalScrollBarVisible) {
+                    return 0;
                 }
                 var h = Math.min(this.AttachedChart.GetPlotHeight() * 0.1, this.MaxWidth);
                 return h;
@@ -2312,6 +2418,10 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.PageUp.setAttribute("opacity", this.Opacity.toString());
             this.PageDown.setAttribute("opacity", this.Opacity.toString());
             this.Thumbnail.setAttribute("opacity", this.Opacity.toString());
+            this.m_bVisible = true;
+            if (!this.SuppressVisibilityChange) {
+                this.FireEvent(VerticalScrollBarEventTypes.Show);
+            }
             _super.prototype.ShowControl.call(this);
         };
         VerticalScrollBar.prototype.HideControl = function () {
@@ -2325,6 +2435,10 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             this.PageUp.setAttribute("opacity", "0");
             this.PageDown.setAttribute("opacity", "0");
             this.Thumbnail.setAttribute("opacity", "0");
+            this.m_bVisible = false;
+            if (!this.SuppressVisibilityChange) {
+                this.FireEvent(VerticalScrollBarEventTypes.Hide);
+            }
             _super.prototype.HideControl.call(this);
         };
         Object.defineProperty(VerticalScrollBar.prototype, "Visible", {
@@ -2334,6 +2448,13 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             enumerable: true,
             configurable: true
         });
+        VerticalScrollBar.prototype.OnHorizontalScrollBarVisibilityChange = function (bVisible) {
+            this.SuppressVisibilityChange = true;
+            if (this.Initialized && this.Visible) {
+                this.Draw(this.AttachedChart);
+            }
+            this.SuppressVisibilityChange = false;
+        };
         VerticalScrollBar.prototype.OnMouseDown = function (e) {
             if (FChartHelper.ObjectIsNullOrEmpty(e) || FChartHelper.ObjectIsNullOrEmpty(e.toElement)) {
                 return;
@@ -2991,6 +3112,8 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             if (dValue == 0) {
                 return dValue;
             }
+            var isPositive = dValue > 0 ? true : false;
+            dValue = Math.abs(dValue);
             var strValue = dValue.toString();
             var strInteger = "";
             var strFloat = "";
@@ -3049,6 +3172,7 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 }
                 dResult = intValue + floatValue;
             }
+            dResult = isPositive ? dResult : -dResult;
             return dResult;
         };
         FChartHelper.SetSVGLineAttributes = function (line, id, x1, y1, x2, y2, strokeWidth, stroke, opacity) {
@@ -3174,10 +3298,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
         };
         FChartCoeff.prototype.Scale = function (scale) {
             this.m_scale = scale;
-        };
-        FChartCoeff.prototype.Translate = function (dx, dy) {
-            this.m_dx = dx;
-            this.m_dy = dy;
         };
         FChartCoeff.prototype.SaveCoeff = function () {
             var coeff = new FChartCoeff();
@@ -3501,26 +3621,14 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             var offsetX = 0;
             var xc1 = this.m_xl + (this.m_xr - this.m_xl) / 2.0;
             var xc2 = this.m_minx + (this.m_maxx - this.m_minx) / 2.0;
-            var diff = xc1 - xc2;
-            if (diff > 0) {
-                offsetX = -this.m_coeff.GetDcWidth(diff);
-            }
-            else {
-                offsetX = this.m_coeff.GetDcWidth(diff);
-            }
+            offsetX = xc1 - xc2;
             return offsetX;
         };
         FChart.prototype.GetOffsetY = function () {
             var offsetY = 0;
             var yc1 = this.m_yb + (this.m_yt - this.m_yb) / 2.0;
             var yc2 = this.m_miny + (this.m_maxy - this.m_miny) / 2.0;
-            var diff = yc1 - yc2;
-            if (diff > 0) {
-                offsetY = -this.m_coeff.GetDcHeight(diff);
-            }
-            else {
-                offsetY = this.m_coeff.GetDcHeight(diff);
-            }
+            offsetY = yc1 - yc2;
             return offsetY;
         };
         Object.defineProperty(FChart.prototype, "Offset", {
@@ -3667,7 +3775,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                         step = step > space ? space : step;
                         this.m_xl -= step;
                         this.m_xr -= step;
-                        this.ZoomRegion(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                     }
                     break;
                 case HorizontalScrollBarEventTypes.LineRight:
@@ -3677,7 +3784,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                         step = step > space ? space : step;
                         this.m_xl += step;
                         this.m_xr += step;
-                        this.ZoomRegion(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                     }
                     break;
                 case HorizontalScrollBarEventTypes.PageLeft:
@@ -3687,7 +3793,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                         step = step > space ? space : step;
                         this.m_xl -= step;
                         this.m_xr -= step;
-                        this.ZoomRegion(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                     }
                     break;
                 case HorizontalScrollBarEventTypes.PageRight:
@@ -3697,19 +3802,18 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                         step = step > space ? space : step;
                         this.m_xl += step;
                         this.m_xr += step;
-                        this.ZoomRegion(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                     }
                     break;
                 case HorizontalScrollBarEventTypes.Scroll:
                     {
                         this.m_xl += scrollValue;
                         this.m_xr += scrollValue;
-                        this.ZoomRegion(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                     }
                     break;
                 default:
                     break;
             }
+            this.ZoomRegion(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
         };
         FChart.prototype.OnVerticalScrollBarEvent = function (eventType, scrollValue) {
             if (scrollValue === void 0) { scrollValue = 0; }
@@ -3820,6 +3924,10 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair(HorizontalScrollBarEventTypes.PageLeft, function (e) { _this.OnHorizontalScrollBarEvent(e); }));
                     this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair(HorizontalScrollBarEventTypes.PageRight, function (e) { _this.OnHorizontalScrollBarEvent(e); }));
                     this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair(HorizontalScrollBarEventTypes.Scroll, function (a, b) { _this.OnHorizontalScrollBarEvent(a, b); }));
+                    if (!FChartHelper.ObjectIsNullOrEmpty(this.VerticalScrollBar) && this.VerticalScrollBar.Show) {
+                        this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair(VerticalScrollBarEventTypes.Show, function (e) { _this.HorizontalScrollBar.OnVerticalScrollBarVisibilityChange(e); }));
+                        this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair(VerticalScrollBarEventTypes.Hide, function (e) { _this.HorizontalScrollBar.OnVerticalScrollBarVisibilityChange(e); }));
+                    }
                 }
                 if (!FChartHelper.ObjectIsNullOrEmpty(this.VerticalScrollBar) && this.VerticalScrollBar.Show) {
                     this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair(VerticalScrollBarEventTypes.LineUp, function (e) { _this.OnVerticalScrollBarEvent(e); }));
@@ -3827,6 +3935,10 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair(VerticalScrollBarEventTypes.PageUp, function (e) { _this.OnVerticalScrollBarEvent(e); }));
                     this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair(VerticalScrollBarEventTypes.PageDown, function (e) { _this.OnVerticalScrollBarEvent(e); }));
                     this.VerticalScrollBar.EventListenerMap.push(new KeyValuePair(VerticalScrollBarEventTypes.Scroll, function (a, b) { _this.OnVerticalScrollBarEvent(a, b); }));
+                    if (!FChartHelper.ObjectIsNullOrEmpty(this.HorizontalScrollBar) && this.HorizontalScrollBar.Show) {
+                        this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair(HorizontalScrollBarEventTypes.Show, function (e) { _this.VerticalScrollBar.OnHorizontalScrollBarVisibilityChange(e); }));
+                        this.HorizontalScrollBar.EventListenerMap.push(new KeyValuePair(HorizontalScrollBarEventTypes.Hide, function (e) { _this.VerticalScrollBar.OnHorizontalScrollBarVisibilityChange(e); }));
+                    }
                 }
             }
             for (var i = 0; i < this.XAxes.length; i++) {
@@ -4085,20 +4197,30 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                 var info = new ScrollBarInfo();
                 info.MinValue = 0;
                 info.MaxValue = (this.m_maxx - this.m_minx) - (this.m_xr - this.m_xl);
-                info.ViewportRegion = new Size((this.m_xr - this.m_xl), (this.m_yt - this.m_yb));
+                info.ViewportRegion = new Region(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                 info.ViewportSize = new Size(this.GetPlotWidth(), this.GetPlotHeight());
-                info.WindowRegion = new Size((this.m_maxx - this.m_minx), (this.m_maxy - this.m_miny));
+                info.WindowRegion = new Region(this.m_minx, this.m_maxy, this.m_maxx, this.m_miny);
                 info.Position = (info.MinValue == info.MaxValue) ? 0 : Math.abs(this.m_xl - this.m_minx) / info.MaxValue;
+                if (!FChartHelper.ObjectIsNullOrEmpty(this.VerticalScrollBar) && this.VerticalScrollBar.Show) {
+                    this.VerticalScrollBar.Info.ViewportRegion = info.ViewportRegion;
+                    this.VerticalScrollBar.Info.ViewportSize = info.ViewportSize;
+                    this.VerticalScrollBar.Info.WindowRegion = info.WindowRegion;
+                }
                 this.HorizontalScrollBar.SetScrollBarInfo(info);
             }
             if (!FChartHelper.ObjectIsNullOrEmpty(this.VerticalScrollBar) && this.VerticalScrollBar.Show) {
                 var info = new ScrollBarInfo();
                 info.MinValue = 0;
                 info.MaxValue = (this.m_maxy - this.m_miny) - (this.m_yt - this.m_yb);
-                info.ViewportRegion = new Size((this.m_xr - this.m_xl), (this.m_yt - this.m_yb));
+                info.ViewportRegion = new Region(this.m_xl, this.m_yt, this.m_xr, this.m_yb);
                 info.ViewportSize = new Size(this.GetPlotWidth(), this.GetPlotHeight());
-                info.WindowRegion = new Size((this.m_maxx - this.m_minx), (this.m_maxy - this.m_miny));
+                info.WindowRegion = new Region(this.m_minx, this.m_maxy, this.m_maxx, this.m_miny);
                 info.Position = (info.MinValue == info.MaxValue) ? 0 : Math.abs(this.m_maxy - this.m_yt) / info.MaxValue;
+                if (!FChartHelper.ObjectIsNullOrEmpty(this.HorizontalScrollBar) && this.HorizontalScrollBar.Show) {
+                    this.HorizontalScrollBar.Info.ViewportRegion = info.ViewportRegion;
+                    this.HorizontalScrollBar.Info.ViewportSize = info.ViewportSize;
+                    this.HorizontalScrollBar.Info.WindowRegion = info.WindowRegion;
+                }
                 this.VerticalScrollBar.SetScrollBarInfo(info);
             }
         };
@@ -4944,7 +5066,6 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                     var y = this.m_coeff.ToWcY(0);
                     yaxis.Value2Wc.push({ Key: "top", Value: y });
                 }
-                yaxis.PlotY = reserveBottomSpace;
             }
         };
         FChart.prototype.CalculateXAxisTickCoordinate = function () {
@@ -5052,8 +5173,9 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
                         xValue = parseFloat(dp.X);
                     }
                     yValue = dp.Y;
+                    yValue = yValue - yaxis.StartValue + yaxis.YDiff;
                     var fx = (xValue - xaxis.StartValue) * xaxis.PixelsPerValue;
-                    var fy = this.m_height - (yValue - yaxis.StartValue) * yaxis.PixelsPerValue;
+                    var fy = this.m_height - yValue * yaxis.PixelsPerValue;
                     dp.fx = this.m_coeff.ToWcX(fx);
                     dp.fy = this.m_coeff.ToWcY(fy);
                 }
@@ -5187,6 +5309,30 @@ define(["require", "exports", "lodash"], function (require, exports, _) {
             if (this.m_scale != 0.0) {
                 this.m_xr = this.m_xl + this.m_scale * this.m_width;
                 this.m_yb = this.m_yt - this.m_scale * this.m_height;
+                if (this.m_xl < this.m_uxl) {
+                    this.m_minx = this.m_xl;
+                }
+                else {
+                    this.m_minx = this.m_uxl;
+                }
+                if (this.m_xr > this.m_uxr) {
+                    this.m_maxx = this.m_xr;
+                }
+                else {
+                    this.m_maxx = this.m_uxr;
+                }
+                if (this.m_yb < this.m_uyb) {
+                    this.m_miny = this.m_yb;
+                }
+                else {
+                    this.m_miny = this.m_uyb;
+                }
+                if (this.m_yt > this.m_uyt) {
+                    this.m_maxy = this.m_yt;
+                }
+                else {
+                    this.m_maxy = this.m_uyt;
+                }
             }
             else {
                 var xx1 = (this.m_maxy - this.m_miny) * this.m_width * 0.5 / this.m_height;
